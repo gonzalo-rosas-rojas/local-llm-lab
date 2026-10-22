@@ -1,0 +1,24 @@
+# Python environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Model weights are never versioned (they are huge; Ollama keeps its own store
+# in ~/.ollama/models). This covers the GGUF files downloaded to ./models.
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# llama.cpp binaries are downloaded, not versioned
+tools/
+
+# Logs and temporary files
+*.log
+logs/
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings
+.claude/
