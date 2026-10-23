@@ -23,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 $llama = Join-Path $PSScriptRoot '..\..\tools\llamacpp\llama-server.exe'
 $model = Join-Path $PSScriptRoot '..\..\models\gguf\gemma-4-26B-A4B-it-UD-Q4_K_M.gguf'
 
+if (-not (Test-Path $llama)) { Write-Host "llama-server is missing in tools\llamacpp (see docs/llama-cpp.md)." -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $model)) { Write-Host "The Gemma 4 GGUF is missing in models\gguf (see docs/moe-offload.md)." -ForegroundColor Red; exit 1 }
 
 Write-Host "Gemma 4 26B-A4B (MoE offload) -> http://localhost:8080   (Ctrl+C to stop)" -ForegroundColor Green

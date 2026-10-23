@@ -8,14 +8,14 @@ It is a learning lab, not a framework. The value is in the measured numbers and 
 
 All numbers come from `llama-bench` (pp512 = prompt processing of 512 tokens, tg128 = generation of 128 tokens) or from Ollama's own timings, on this one machine, with no confidence intervals: treat them as ballpark figures, not a rigorous benchmark.
 
-### Ollama, models that fit in VRAM
+### Stage 1: Ollama, models that fit in VRAM
 
 | Model | Role | Speed | GPU / VRAM |
 |---|---|---|---|
 | `qwen3:8b` | fast starter | ~89 tok/s | 100% GPU, ~6 GB |
 | `gpt-oss:20b` | main model (MoE, ~3.6B active) | ~113 tok/s | 100% GPU, ~14 GB |
 
-### llama.cpp directly, same model as Ollama
+### Stage 2: llama.cpp directly, same model as Ollama
 
 Qwen3 8B Q4_K_M (4.68 GB), build b9482 with CUDA 12.4 binaries (the 13.x build does not work with driver 555.97).
 
@@ -27,7 +27,7 @@ Qwen3 8B Q4_K_M (4.68 GB), build b9482 with CUDA 12.4 binaries (the 13.x build d
 
 Same model through Ollama generates at ~89 tok/s, so llama.cpp is ~13% faster, in exchange for managing the flags yourself. See [docs/llama-cpp.md](docs/llama-cpp.md).
 
-### Mixture-of-experts offload, a model that does not fit
+### Stage 3: Mixture-of-experts offload, a model that does not fit
 
 Gemma 4 26B-A4B (25.23B parameters, ~3.8B active per token), GGUF UD-Q4_K_M, 15.78 GB: too big for 16 GB of VRAM once the KV cache and buffers are counted.
 
@@ -47,7 +47,7 @@ Do not offload more than you must: fill VRAM first and send only the remainder t
 
 ## Claude Code on a local model
 
-Ollama 0.14+ speaks the Anthropic Messages API, so Claude Code can run against a local model by setting a few environment variables for one process. `scripts/claude-local.ps1` does that without touching the normal Claude Code setup. A local 8-30B model is much weaker than Claude in the agentic loop (tool calls fail, edits are imprecise), so it is for learning, light tasks and privacy, not a replacement. Details in [docs/claude-code-local.md](docs/claude-code-local.md).
+Ollama 0.14+ speaks the Anthropic Messages API, so Claude Code can run against a local model by setting a few environment variables for one launch. `scripts/claude-local.ps1` does that without touching the normal Claude Code setup. A local 8-30B model is much weaker than Claude in the agentic loop (tool calls fail, edits are imprecise), so it is for learning, light tasks and privacy, not a replacement. Details in [docs/claude-code-local.md](docs/claude-code-local.md).
 
 ## Run it
 
@@ -79,7 +79,7 @@ Daily use: `.\scripts\start-lab.ps1` turns the lab on, `.\scripts\stop-lab.ps1` 
 scripts/            install, pull, start/stop, llama-server launchers, Claude Code launcher
 scripts/llama-server/   run-qwen3-8b.ps1, run-gemma4-moe.ps1 (the flags are explained in the header)
 clients/            smoke_test.py, a streaming client that reports TTFT and tok/s
-docs/               the measurements and what they mean
+docs/               llama.cpp and MoE offload measurements, Claude Code on a local model
 ```
 
 ## License

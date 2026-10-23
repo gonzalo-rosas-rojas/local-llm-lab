@@ -4,11 +4,16 @@
   ------------------------------------------------------------------
   Starts Open WebUI (a ChatGPT-style UI) in Docker, connected to the local Ollama.
 
-    - Port 3000 -> open http://localhost:3000
+    - Port 3000 on 127.0.0.1 only -> open http://localhost:3000
+      (Open WebUI's own quick start uses -p 3000:8080, which listens on every
+      network interface, so other machines on your Wi-Fi/LAN could reach it.)
     - --add-host host.docker.internal:host-gateway  lets the container talk to
       Ollama running on the HOST (localhost:11434).
     - The 'open-webui' volume keeps chats/users across restarts.
     - --restart always  makes it start by itself when Docker starts.
+    - A container created by an earlier version of this script keeps its old port
+      binding: run  docker rm -f open-webui  and then this script again (the
+      'open-webui' volume keeps chats and users).
 
   Requires Docker Desktop to be running.
 #>
@@ -28,7 +33,7 @@ if ($exists -eq 'open-webui') {
 } else {
     Write-Host "==> Creating the 'open-webui' container..." -ForegroundColor Cyan
     docker run -d `
-        -p 3000:8080 `
+        -p 127.0.0.1:3000:8080 `
         --add-host=host.docker.internal:host-gateway `
         -v open-webui:/app/backend/data `
         --name open-webui `

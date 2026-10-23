@@ -4,13 +4,13 @@ Use the same **Claude Code** you already know, but **powered by a local Ollama**
 
 ## How it works
 
-Claude Code respects environment variables. The launcher `scripts/claude-local.ps1` sets them **only in that process**, so a normal Claude Code (Anthropic) is NOT affected:
+Claude Code respects environment variables. The launcher `scripts/claude-local.ps1` sets them **only while Claude Code runs** and restores the previous values when it exits, so a normal Claude Code (Anthropic) is NOT affected:
 
 | Variable | Value |
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://localhost:11434` |
 | `ANTHROPIC_AUTH_TOKEN` | `ollama` |
-| `ANTHROPIC_API_KEY` | (empty) |
+| `ANTHROPIC_API_KEY` | (removed for the launch) |
 | `ANTHROPIC_MODEL` | `gpt-oss-cc:latest` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `qwen3:8b` |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` |

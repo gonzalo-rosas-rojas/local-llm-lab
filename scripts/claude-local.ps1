@@ -5,8 +5,9 @@
   Launches Claude Code against a LOCAL LLM (Ollama) instead of Anthropic's cloud.
   It works because Ollama 0.14+ speaks the native Anthropic API (/v1/messages).
 
-  IMPORTANT: the variables are set ONLY in this process, so the normal
-  Claude Code setup (with Anthropic) stays untouched.
+  IMPORTANT: the variables are set only while Claude Code runs and the script
+  restores the previous values when it exits, so the normal Claude Code setup
+  (with Anthropic) stays untouched, even in the same PowerShell window.
 
   Usage:
     .\scripts\claude-local.ps1                      # interactive, gpt-oss (ctx 32k)
@@ -22,28 +23,41 @@ param(
     [Parameter(ValueFromRemainingArguments = $true)] $Rest
 )
 $ErrorActionPreference = 'Stop'
-$env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
 
-# Ollama must be running
-try { Invoke-WebRequest 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 3 | Out-Null }
-catch { Write-Host "Ollama is not answering. Run first: .\scripts\start-lab.ps1" -ForegroundColor Red; exit 1 }
+# A script run from a prompt shares the caller's process, so $env: changes would
+# outlive it. Save what we touch and put it back in the finally block below.
+$names = 'Path', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY',
+         'ANTHROPIC_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'
+$saved = @{}
+foreach ($n in $names) { $saved[$n] = [System.Environment]::GetEnvironmentVariable($n, 'Process') }
 
-# Claude Code needs a lot of context. If you asked for gpt-oss-cc and it does not
-# exist, create a gpt-oss variant with a large num_ctx (Ollama's default is small).
-if ($Model -eq 'gpt-oss-cc:latest' -and -not (ollama list | Select-String -SimpleMatch 'gpt-oss-cc')) {
-    Write-Host "Creating gpt-oss-cc (num_ctx 32768) from gpt-oss:20b..." -ForegroundColor Cyan
-    $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
-    "FROM gpt-oss:20b`nPARAMETER num_ctx 32768" | Set-Content -Path $mf -Encoding ascii
-    ollama create gpt-oss-cc -f $mf | Out-Null
+try {
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+
+    # Ollama must be running
+    try { Invoke-WebRequest 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 3 | Out-Null }
+    catch { Write-Host "Ollama is not answering. Run first: .\scripts\start-lab.ps1" -ForegroundColor Red; exit 1 }
+
+    # Claude Code needs a lot of context. If you asked for gpt-oss-cc and it does not
+    # exist, create a gpt-oss variant with a large num_ctx (Ollama's default is small).
+    if ($Model -eq 'gpt-oss-cc:latest' -and -not (ollama list | Select-String -SimpleMatch 'gpt-oss-cc')) {
+        Write-Host "Creating gpt-oss-cc (num_ctx 32768) from gpt-oss:20b..." -ForegroundColor Cyan
+        $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
+        "FROM gpt-oss:20b`nPARAMETER num_ctx 32768" | Set-Content -Path $mf -Encoding ascii
+        ollama create gpt-oss-cc -f $mf | Out-Null
+    }
+
+    # Variables for this launch only (restored when claude exits)
+    $env:ANTHROPIC_BASE_URL = 'http://localhost:11434'
+    $env:ANTHROPIC_AUTH_TOKEN = 'ollama'
+    $env:ANTHROPIC_API_KEY = ''
+    $env:ANTHROPIC_MODEL = $Model
+    $env:ANTHROPIC_SMALL_FAST_MODEL = 'qwen3:8b'
+    $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+
+    Write-Host "Claude Code -> LOCAL Ollama ($Model). Your normal Claude Code is NOT affected." -ForegroundColor Green
+    & claude --model $Model @Rest
 }
-
-# Variables for THIS process only (they do not persist; your real Claude Code is unchanged)
-$env:ANTHROPIC_BASE_URL = 'http://localhost:11434'
-$env:ANTHROPIC_AUTH_TOKEN = 'ollama'
-$env:ANTHROPIC_API_KEY = ''
-$env:ANTHROPIC_MODEL = $Model
-$env:ANTHROPIC_SMALL_FAST_MODEL = 'qwen3:8b'
-$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
-
-Write-Host "Claude Code -> LOCAL Ollama ($Model). Your normal Claude Code is NOT affected." -ForegroundColor Green
-& claude --model $Model @Rest
+finally {
+    foreach ($n in $names) { [System.Environment]::SetEnvironmentVariable($n, $saved[$n], 'Process') }
+}
