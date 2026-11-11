@@ -1,2 +1,2 @@
 # Client for Ollama's OpenAI-compatible API
-openai>=1.0
+openai>=3.46.0
