@@ -57,7 +57,7 @@ Do not offload more than you must: fill VRAM first and send only the remainder t
 
 Each row is one JSON record in [`results/`](results/) (schema and field meanings in [results/README.md](results/README.md)). Dates are the date of the commit that first states the figure, not of the measurement. "not recorded" means the lab never logged it; the record holds `null` and a note.
 
-| Record | Engine | Date | Runs | Exact command logged |
+| Record | Engine | Date | Runs | Command given in the repo |
 |---|---|---|---|---|
 | [`stage1-ollama-qwen3-8b`](results/stage1-ollama-qwen3-8b.json) | Ollama | 2026-10-22 (commit date) | not recorded | no |
 | [`stage1-ollama-gpt-oss-20b`](results/stage1-ollama-gpt-oss-20b.json) | Ollama | 2026-10-22 (commit date) | not recorded | no |

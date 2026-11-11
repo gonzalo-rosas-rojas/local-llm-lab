@@ -268,7 +268,7 @@ def provenance_section(records):
         "measurement. \"not recorded\" means the lab never logged it; the record holds `null` "
         "and a note.",
         "",
-        "| Record | Engine | Date | Runs | Exact command logged |",
+        "| Record | Engine | Date | Runs | Command given in the repo |",
         "|---|---|---|---|---|",
     ]
     for r in records:
