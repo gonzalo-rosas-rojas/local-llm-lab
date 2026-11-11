@@ -88,3 +88,26 @@ function Get-LabProcess {
     }
     return [pscustomobject]@{ Match = $match; Other = $other }
 }
+
+function Test-LoopbackAddress {
+    # True for 127.0.0.0/8, ::1 and their IPv4-mapped IPv6 forms. Everything else, including
+    # 0.0.0.0 and ::, which mean "every interface", is not loopback.
+    param([Parameter(Mandatory)][string]$Address)
+    $text = $Address.Trim()
+    if ($text -match '^::ffff:(\d+\.\d+\.\d+\.\d+)$') { $text = $Matches[1] }
+    $ip = $null
+    if (-not [System.Net.IPAddress]::TryParse($text, [ref]$ip)) { return $false }
+    return [System.Net.IPAddress]::IsLoopback($ip)
+}
+
+function Get-LabPort {
+    # Ports the lab's scripts mention: host:port after localhost or 127.0.0.1, and --port N.
+    param([Parameter(Mandatory)][string[]]$ScriptPath)
+    $ports = @()
+    foreach ($path in $ScriptPath) {
+        $text = Get-Content -LiteralPath $path -Raw
+        foreach ($m in [regex]::Matches($text, '(?:localhost|127\.0\.0\.1):(\d{2,5})')) { $ports += [int]$m.Groups[1].Value }
+        foreach ($m in [regex]::Matches($text, '--port\s+(\d{2,5})')) { $ports += [int]$m.Groups[1].Value }
+    }
+    return @($ports | Sort-Object -Unique)
+}

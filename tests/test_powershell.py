@@ -30,7 +30,7 @@ def ps_files():
 class PowerShellScripts(unittest.TestCase):
     def test_there_are_scripts_to_check(self):
         names = {p.name for p in ps_files()}
-        for expected in ("01-install-ollama.ps1", "stop-lab.ps1", "run-bench.ps1"):
+        for expected in ("01-install-ollama.ps1", "stop-lab.ps1", "run-bench.ps1", "check-loopback.ps1"):
             self.assertIn(expected, names)
 
     def test_every_script_parses_without_errors(self):

@@ -44,6 +44,32 @@ Assert-Equal (Test-PathUnder -Path 'c:\lab\TOOLS\llamacpp\x.exe' -Root 'C:\Lab\t
 Assert-Equal (Test-PathUnder -Path 'C:\Lab\tools\llamacpp\..\..\evil.exe' -Root 'C:\Lab\tools\llamacpp') $false 'parent segments are resolved'
 Assert-Equal (Test-PathUnder -Path $null -Root 'C:\Lab') $false 'an unreadable path is outside'
 
+# Loopback: only 127.0.0.0/8 and ::1 are local; "every interface" addresses are not.
+Assert-Equal (Test-LoopbackAddress -Address '127.0.0.1') $true '127.0.0.1 is loopback'
+Assert-Equal (Test-LoopbackAddress -Address '127.5.4.3') $true 'all of 127/8 is loopback'
+Assert-Equal (Test-LoopbackAddress -Address '::1') $true '::1 is loopback'
+Assert-Equal (Test-LoopbackAddress -Address '::ffff:127.0.0.1') $true 'IPv4-mapped loopback'
+Assert-Equal (Test-LoopbackAddress -Address '0.0.0.0') $false '0.0.0.0 listens on every interface'
+Assert-Equal (Test-LoopbackAddress -Address '::') $false ':: listens on every interface'
+Assert-Equal (Test-LoopbackAddress -Address '192.168.1.20') $false 'a LAN address is not loopback'
+Assert-Equal (Test-LoopbackAddress -Address '::ffff:10.0.0.1') $false 'IPv4-mapped LAN address'
+Assert-Equal (Test-LoopbackAddress -Address 'not-an-address') $false 'garbage is not loopback'
+
+# Ports are read from the scripts, not typed in again.
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('lab-ports-' + [guid]::NewGuid().ToString('N') + '.ps1')
+try {
+    Set-Content -LiteralPath $tmp -Value @(
+        '# http://localhost:11434/api and http://127.0.0.1:3000',
+        '& $llama -m $m --host 127.0.0.1 --port 8080',
+        '-p 127.0.0.1:3000:8080'
+    )
+    Assert-Equal (Get-LabPort -ScriptPath $tmp) @(3000, 8080, 11434) 'ports found in a script, container-side port ignored'
+} finally {
+    Remove-Item -LiteralPath $tmp -ErrorAction Ignore
+}
+$real = @(Get-ChildItem -Path (Join-Path $PSScriptRoot '..\scripts') -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'check-loopback.ps1' } | ForEach-Object { $_.FullName })
+Assert-Equal (Get-LabPort -ScriptPath $real) @(3000, 8080, 11434) 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
+
 # External programs: exit codes come back, stderr does not throw, a missing program is 127.
 $missing = Invoke-External -Exe 'definitely-not-installed-xyz'
 Assert-Equal $missing.ExitCode 127 'missing program gives 127'
