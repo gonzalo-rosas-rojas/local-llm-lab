@@ -97,7 +97,7 @@ Daily use: `.\scripts\start-lab.ps1` turns the lab on, `.\scripts\stop-lab.ps1` 
 The figures above are archived records, not output of a script you can run to get them back: they were taken before this repository had a benchmark runner, and nothing in it regenerates them. What you can do:
 
 - Regenerate the tables and the chart from `results/`: `python tools/render_results.py` (standard library only). `python tools/render_results.py --check` fails if the README or the SVG no longer match the data, and the tests run it.
-- Produce new records on your own machine with `bench/run-bench.ps1`, which runs `llama-bench` several times, keeps every run and the median, and writes a JSON file in the same schema. See [docs/benchmarking.md](docs/benchmarking.md). It has not been run by the author yet, so no record in `results/` comes from it.
+- Produce new records on your own machine with `bench/run-bench.ps1`, which runs `llama-bench` several times, keeps every run and the median, and writes a JSON file in the same schema. See [docs/benchmarking.md](docs/benchmarking.md). No record in `results/` comes from the runner yet; the first one that does will be marked by its `source` field.
 - Run the checks: `python -m unittest discover -s tests`.
 
 ## Security

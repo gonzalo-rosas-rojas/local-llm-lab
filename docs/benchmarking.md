@@ -1,6 +1,6 @@
 # Measuring again: `bench/run-bench.ps1`
 
-The figures in the README were typed in as they were measured; the lab had no runner that produced them. `bench/run-bench.ps1` is that runner. It has not been run by the author yet, so every record currently in [`results/`](../results/) predates it and says so.
+The figures in the README were typed in as they were measured; the lab had no runner that produced them. `bench/run-bench.ps1` is that runner. No record in `results/` comes from the runner yet; the first one that does will be marked by its `source` field.
 
 ## What it does
 
