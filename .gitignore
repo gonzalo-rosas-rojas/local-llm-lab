@@ -12,7 +12,7 @@ models/
 *.bin
 
 # llama.cpp binaries are downloaded, not versioned
-tools/
+/tools/llamacpp/
 
 # Logs and temporary files
 *.log

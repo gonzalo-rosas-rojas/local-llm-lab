@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "stage1-ollama-qwen3-8b",
+  "stage": 1,
+  "order": 1,
+  "role": "fast starter",
+  "model": {
+    "name": "qwen3:8b",
+    "quantization": "Q4_K_M",
+    "file": null,
+    "size_gb": null,
+    "parameters_b": null,
+    "active_parameters_b": null
+  },
+  "engine": {
+    "name": "Ollama",
+    "version": null,
+    "build": null,
+    "backend": null
+  },
+  "parameters": {
+    "gpu_layers": null,
+    "gpu_offload": "100% GPU",
+    "context": null,
+    "kv_cache_type": null,
+    "flash_attention": null,
+    "flags": null
+  },
+  "chart": { "label": "qwen3:8b", "sublabel": "Ollama", "series": "Ollama" },
+  "metrics": [
+    {
+      "name": "generation_speed",
+      "label": "generation",
+      "unit": "tok/s",
+      "value": 89,
+      "approximate": true,
+      "statistic": null,
+      "samples": null
+    },
+    {
+      "name": "vram",
+      "label": "VRAM",
+      "unit": "GB",
+      "value": 6,
+      "approximate": true,
+      "statistic": null,
+      "samples": null
+    }
+  ],
+  "hardware": {
+    "gpu": "RTX 4090 Laptop",
+    "vram_gb": 16,
+    "ram_gb": 64,
+    "cpu": null
+  },
+  "system": {
+    "os": "Windows 11",
+    "gpu_driver": null
+  },
+  "measured_on": {
+    "date": "2026-10-22",
+    "date_kind": "commit",
+    "commit": "d55bbb0"
+  },
+  "command": null,
+  "runs": null,
+  "source": {
+    "file": "README.md",
+    "section": "What I measured / Stage 1: Ollama, models that fit in VRAM",
+    "also_in": ["scripts/02-pull-models.ps1 (comments)"]
+  },
+  "notes": [
+    "Date is the date of the commit that first states the speed figure (d55bbb0; the VRAM figure first appears in 3765c6b), not of the measurement.",
+    "Number of runs, exact command, Ollama version and driver were not recorded.",
+    "The README says the number comes from Ollama's own timings; which Ollama command or field was read is not recorded.",
+    "Quantization Q4_K_M is the default tag that scripts/02-pull-models.ps1 says Ollama pulls, and docs/llama-cpp.md calls the stage 2 file the same model as Ollama; it was not read from the model at measurement time.",
+    "The VRAM figure is the approximate value stated next to the speed (about 6 GB)."
+  ]
+}
