@@ -122,12 +122,11 @@ class RecordsMatchSchema(unittest.TestCase):
 
 
 class GeneratedFilesAreCurrent(unittest.TestCase):
-    def test_readme_and_svg_match_the_generator(self):
-        want_readme, want_svg = rr.build(ROOT)
-        have_readme = norm((ROOT / "README.md").read_text(encoding="utf-8"))
-        have_svg = norm((ROOT / rr.SVG_PATH).read_text(encoding="utf-8"))
-        self.assertEqual(have_readme, want_readme, "README.md is stale: run python tools/render_results.py")
-        self.assertEqual(have_svg, want_svg, "the SVG is stale: run python tools/render_results.py")
+    def test_generated_files_match_the_generator(self):
+        for rel, want in rr.build(ROOT).items():
+            with self.subTest(rel):
+                have = norm((ROOT / rel).read_text(encoding="utf-8"))
+                self.assertEqual(have, want, f"{rel} is stale: run python tools/render_results.py")
 
     def test_svg_is_well_formed_and_accessible(self):
         text = (ROOT / rr.SVG_PATH).read_text(encoding="utf-8")
