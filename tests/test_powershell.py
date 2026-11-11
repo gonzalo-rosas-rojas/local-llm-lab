@@ -1,6 +1,6 @@
 """PowerShell checks: every script parses, and the shared helpers behave.
 
-Skipped when no PowerShell is installed; the helper checks also need Windows (cmd.exe).
+Skipped unless Windows PowerShell is available (the scripts target 5.1 on Windows).
 """
 import os
 import shutil
@@ -10,7 +10,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PS = shutil.which("pwsh") or shutil.which("powershell")
+# Windows PowerShell 5.1 is what the scripts target, so it is the one the tests use.
+PS = shutil.which("powershell") if sys.platform == "win32" else None
 
 PARSE = (
     "$bad = 0; "
@@ -26,7 +27,7 @@ def ps_files():
     return sorted(p for p in ROOT.rglob("*.ps1") if not skip & set(p.relative_to(ROOT).parts))
 
 
-@unittest.skipUnless(PS, "PowerShell is not installed")
+@unittest.skipUnless(PS, "Windows PowerShell is not available")
 class PowerShellScripts(unittest.TestCase):
     def test_there_are_scripts_to_check(self):
         names = {p.name for p in ps_files()}
@@ -39,7 +40,6 @@ class PowerShellScripts(unittest.TestCase):
                               text=True, env=env, timeout=120)
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
-    @unittest.skipUnless(sys.platform == "win32", "uses cmd.exe")
     def test_shared_helpers(self):
         proc = subprocess.run([PS, "-NoProfile", "-File", str(ROOT / "tests" / "Test-Scripts.ps1")],
                               capture_output=True, text=True, timeout=120)

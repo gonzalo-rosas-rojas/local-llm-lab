@@ -75,7 +75,7 @@ try {
     if ([System.IO.Path]::GetExtension($Model) -ne '.gguf') {
         throw "The model '$Model' is not a .gguf file."
     }
-    $benchArgs = Get-BenchArguments -ModelPath (Resolve-Path -LiteralPath $Model).Path -Flags $Flags -Prompt $Prompt -Generate $Generate
+    $benchArgs = Get-BenchArgumentList -ModelPath (Resolve-Path -LiteralPath $Model).Path -Flags $Flags -Prompt $Prompt -Generate $Generate
 
     $stamp = [DateTime]::UtcNow
     $timestampUtc = $stamp.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
@@ -91,7 +91,7 @@ try {
         throw "The output folder '$outDir' does not exist."
     }
 
-    $command = Join-NativeArguments -Arguments (@($LlamaBench) + $benchArgs)
+    $command = Join-NativeArgument -Arguments (@($LlamaBench) + $benchArgs)
     Write-Host "==> $Runs run(s): $command" -ForegroundColor Cyan
 
     $samples = @{}      # label -> list of values, in run order
@@ -118,7 +118,7 @@ try {
     }
     $hw = Get-Hardware
     $size = (Get-Item -LiteralPath $Model).Length / 1GB
-    $record = New-ResultRecord -ModelFile ([System.IO.Path]::GetFileName($Model)) -ModelSizeGiB $size `
+    $record = Get-ResultRecord -ModelFile ([System.IO.Path]::GetFileName($Model)) -ModelSizeGiB $size `
         -Build $build -Backend $backend -Flags $Flags -Command $command -Series @($series) -Runs $Runs `
         -TimestampUtc $timestampUtc -Gpu $hw.Gpu -VramGb $hw.VramGb -RamGb $hw.RamGb -Cpu $hw.Cpu `
         -Os $hw.Os -Driver $hw.Driver `

@@ -7,8 +7,8 @@
   process on its own except Invoke-Native.
 
   What is tested and what is not:
-    - Get-Median, Join-NativeArguments, Get-BenchArguments, Get-FlagValue and
-      New-ResultRecord are tested with values written in the test itself.
+    - Get-Median, Join-NativeArgument, Get-BenchArgumentList, Get-FlagValue and
+      Get-ResultRecord are tested with values written in the test itself.
     - ConvertFrom-BenchOutput is NOT tested. It reads llama-bench's JSON output
       (-o json) using the fields n_prompt, n_gen, avg_ts, build_number,
       build_commit and backends, as documented by llama.cpp, but this repository
@@ -37,7 +37,7 @@ function Get-FlagValue {
     return $null
 }
 
-function Test-BenchFlags {
+function Test-BenchFlag {
     # Flags the runner sets itself cannot be passed again.
     param([string[]]$Flags)
     $reserved = '-m', '--model', '-p', '--n-prompt', '-n', '--n-gen', '-r', '--repetitions', '-o', '--output', '-oe', '--output-err'
@@ -48,7 +48,7 @@ function Test-BenchFlags {
     }
 }
 
-function Get-BenchArguments {
+function Get-BenchArgumentList {
     # Arguments for ONE llama-bench invocation: a single repetition of the prompt
     # and generation tests, JSON on stdout. The script calls it -Runs times.
     param(
@@ -57,11 +57,11 @@ function Get-BenchArguments {
         [int]$Prompt = 512,
         [int]$Generate = 128
     )
-    Test-BenchFlags -Flags $Flags
+    Test-BenchFlag -Flags $Flags
     return @('-m', $ModelPath, '-p', "$Prompt", '-n', "$Generate", '-r', '1', '-o', 'json') + @($Flags)
 }
 
-function Join-NativeArguments {
+function Join-NativeArgument {
     # Quotes an argument list into the single string that .NET (Windows PowerShell
     # 5.1 has no ArgumentList) hands to CreateProcess. Also used for the command
     # line written to the result record.
@@ -83,7 +83,7 @@ function Invoke-Native {
     param([Parameter(Mandatory)][string]$Exe, [string[]]$Arguments = @())
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $Exe
-    $psi.Arguments = Join-NativeArguments -Arguments $Arguments
+    $psi.Arguments = Join-NativeArgument -Arguments $Arguments
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
@@ -131,7 +131,7 @@ function ConvertFrom-BenchOutput {
     return $found
 }
 
-function New-ResultRecord {
+function Get-ResultRecord {
     # Builds a record in the results/schema.json layout. Every key is present; what
     # the caller could not learn is $null. `Series` is a list of objects with Name,
     # Label and Samples (one value per run, in run order).

@@ -1,6 +1,6 @@
 """Runs the PowerShell checks of bench/lib.ps1 and validates the record they emit.
 
-Skipped when neither PowerShell 7 (pwsh) nor Windows PowerShell is installed.
+Skipped unless Windows PowerShell is available (the scripts target 5.1 on Windows).
 """
 import json
 import shutil
@@ -15,10 +15,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import render_results as rr  # noqa: E402
 
-PS = shutil.which("pwsh") or shutil.which("powershell")
+# Windows PowerShell 5.1 is what the scripts target, so it is the one the tests use.
+PS = shutil.which("powershell") if sys.platform == "win32" else None
 
 
-@unittest.skipUnless(PS, "PowerShell is not installed")
+@unittest.skipUnless(PS, "Windows PowerShell is not available")
 class BenchLibrary(unittest.TestCase):
     def test_powershell_checks_pass_and_the_record_matches_the_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
