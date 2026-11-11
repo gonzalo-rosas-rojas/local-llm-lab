@@ -5,6 +5,7 @@
 ## Model used
 
 - **Gemma 4 26B-A4B**: 25.23B total / ~3.8B active parameters. GGUF `UD-Q4_K_M` from unsloth, **15.78 GB**.
+- That file is not the one behind Ollama's tag `gemma4:26b-a4b-it-q4_K_M`, which `scripts/02-pull-models.ps1` lists at about 18 GB. The 15.78 GB figure is the unsloth GGUF used with llama.cpp in this stage; the 18 GB figure is the Ollama tag the stage 1 script declines to pull.
 - It does not fit entirely in 16 GB next to the KV cache and buffers, so offload is needed.
 - It is a **"thinking"** model (it fills `reasoning_content`); raise `max_tokens` to see the final answer.
 

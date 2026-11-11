@@ -1,4 +1,4 @@
-# local-llm-lab
+# local-llm-lab: local LLMs on Windows with PowerShell
 
 A Windows and PowerShell lab for running open-weight language models locally on one gaming laptop (RTX 4090 Laptop, 16 GB VRAM, 64 GB RAM, Windows 11), measuring what each knob costs or buys, and wiring the result into real tools: an OpenAI-compatible API, a chat UI, and Claude Code itself.
 

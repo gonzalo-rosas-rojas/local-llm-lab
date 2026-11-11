@@ -79,6 +79,13 @@ class RecordsMatchSchema(unittest.TestCase):
         stated = sum(len(r["metrics"]) for r in records.values())
         self.assertEqual(stated, len(ORIGINAL_FIGURES), "a metric was added that the README never had")
 
+    def test_every_figure_appears_in_the_file_the_record_cites(self):
+        for record in rr.load_records(ROOT):
+            source = (ROOT / record["source"]["file"]).read_text(encoding="utf-8")
+            for m in record["metrics"]:
+                with self.subTest(f"{record['id']} {m['name']}"):
+                    self.assertIn(rr.shown(m), source)
+
     def test_validator_rejects_bad_records(self):
         good = json.loads(record_files()[0].read_text(encoding="utf-8"))
         cases = {}

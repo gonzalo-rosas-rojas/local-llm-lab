@@ -5,7 +5,7 @@
   Serves Gemma 4 26B-A4B (MoE: 25B total / ~3.8B active), which does NOT fit
   entirely in 16 GB of VRAM, by offloading experts to RAM. OpenAI API on :8080/v1.
 
-  The model weighs 15.78 GB. With --fit-target, llama.cpp keeps as many experts
+  The model file (the unsloth UD-Q4_K_M GGUF, not Ollama's ~18 GB gemma4 tag) weighs 15.78 GB. With --fit-target, llama.cpp keeps as many experts
   on the GPU as fit (leaving ~1 GB of margin) and sends the rest to the 64 GB of RAM.
   Measured: ~76 tok/s  (vs ~34 if ALL experts go to RAM with --cpu-moe).
 
