@@ -24,3 +24,7 @@ if (-not (Test-Path $model)) { Write-Host "The GGUF is missing in models\gguf." 
 
 Write-Host "llama-server -> http://localhost:8080   (Ctrl+C to stop)" -ForegroundColor Green
 & $llama -m $model -ngl 99 -fa 1 -c 8192 -ctk q8_0 -ctv q8_0 --jinja --host 127.0.0.1 --port 8080
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "llama-server exited with code $LASTEXITCODE." -ForegroundColor Red
+    exit $LASTEXITCODE
+}

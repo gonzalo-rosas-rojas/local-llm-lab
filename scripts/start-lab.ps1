@@ -8,6 +8,8 @@
   Usage:  .\scripts\start-lab.ps1
           (if the policy blocks it: powershell -ExecutionPolicy Bypass -File .\scripts\start-lab.ps1)
 #>
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'common.ps1')
 
 $ollamaApp = "$env:LOCALAPPDATA\Programs\Ollama\ollama app.exe"
 $ollamaExe = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
@@ -29,11 +31,15 @@ if (Test-Ollama) {
 }
 
 Write-Host "==> Open WebUI (only if Docker is running)..." -ForegroundColor Cyan
-docker info 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    docker start open-webui 2>$null | Out-Null
-    Write-Host "    Open WebUI -> http://localhost:3000" -ForegroundColor Green
-    Start-Process 'http://localhost:3000'
+$docker = Invoke-External -Exe 'docker' -Arguments @('info') -Capture
+if ($docker.ExitCode -eq 0) {
+    $start = Invoke-External -Exe 'docker' -Arguments @('start', 'open-webui') -Capture
+    if ($start.ExitCode -eq 0) {
+        Write-Host "    Open WebUI -> http://localhost:3000" -ForegroundColor Green
+        Start-Process 'http://localhost:3000'
+    } else {
+        Write-Host "    The 'open-webui' container could not be started (it may not exist yet: run .\scripts\03-start-openwebui.ps1)." -ForegroundColor Yellow
+    }
 } else {
     Write-Host "    Docker is not running. Open Docker Desktop and Open WebUI will start by itself." -ForegroundColor Yellow
 }

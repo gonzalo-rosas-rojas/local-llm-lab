@@ -28,3 +28,7 @@ if (-not (Test-Path $model)) { Write-Host "The Gemma 4 GGUF is missing in models
 
 Write-Host "Gemma 4 26B-A4B (MoE offload) -> http://localhost:8080   (Ctrl+C to stop)" -ForegroundColor Green
 & $llama -m $model -ngl 99 -fa 1 --fit-target 1024 -c 8192 --jinja --host 127.0.0.1 --port 8080
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "llama-server exited with code $LASTEXITCODE." -ForegroundColor Red
+    exit $LASTEXITCODE
+}

@@ -23,6 +23,7 @@ param(
     [Parameter(ValueFromRemainingArguments = $true)] $Rest
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'common.ps1')
 
 # A script run from a prompt shares the caller's process, so $env: changes would
 # outlive it. Save what we touch and put it back in the finally block below.
@@ -30,6 +31,7 @@ $names = 'Path', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KE
          'ANTHROPIC_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'
 $saved = @{}
 foreach ($n in $names) { $saved[$n] = [System.Environment]::GetEnvironmentVariable($n, 'Process') }
+$exitCode = 0
 
 try {
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
@@ -40,15 +42,23 @@ try {
 
     # Claude Code needs a lot of context. If you asked for gpt-oss-cc and it does not
     # exist, create a gpt-oss variant with a large num_ctx (Ollama's default is small).
-    if ($Model -eq 'gpt-oss-cc:latest' -and -not (ollama list | Select-String -SimpleMatch 'gpt-oss-cc')) {
-        Write-Host "Creating gpt-oss-cc (num_ctx 32768) from gpt-oss:20b..." -ForegroundColor Cyan
-        $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
-        "FROM gpt-oss:20b`nPARAMETER num_ctx 32768" | Set-Content -Path $mf -Encoding ascii
-        ollama create gpt-oss-cc -f $mf | Out-Null
+    if ($Model -eq 'gpt-oss-cc:latest') {
+        $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
+        if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode))." }
+        if (-not (Test-ModelListed -ListLines $list.Output -Tag 'gpt-oss-cc:latest')) {
+            Write-Host "Creating gpt-oss-cc (num_ctx 32768) from gpt-oss:20b..." -ForegroundColor Cyan
+            $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
+            "FROM gpt-oss:20b`nPARAMETER num_ctx 32768" | Set-Content -Path $mf -Encoding ascii
+            $create = Invoke-External -Exe 'ollama' -Arguments @('create', 'gpt-oss-cc', '-f', $mf) -Capture
+            if ($create.ExitCode -ne 0) { throw "'ollama create gpt-oss-cc' failed (exit code $($create.ExitCode)). Is gpt-oss:20b downloaded? Run .\scripts\02-pull-models.ps1" }
+        }
     }
+    if (-not (Get-Command claude -ErrorAction Ignore)) { throw "The 'claude' command was not found. Install Claude Code first." }
 
     # Variables for this launch only (restored when claude exits)
     $env:ANTHROPIC_BASE_URL = 'http://localhost:11434'
+    # 'ollama' is a placeholder, not a secret: Ollama does not check the token, but Claude Code
+    # wants a non-empty value here.
     $env:ANTHROPIC_AUTH_TOKEN = 'ollama'
     $env:ANTHROPIC_API_KEY = ''
     $env:ANTHROPIC_MODEL = $Model
@@ -57,7 +67,13 @@ try {
 
     Write-Host "Claude Code -> LOCAL Ollama ($Model). Your normal Claude Code is NOT affected." -ForegroundColor Green
     & claude --model $Model @Rest
+    $exitCode = $LASTEXITCODE
+}
+catch {
+    Write-Host "claude-local: $($_.Exception.Message)" -ForegroundColor Red
+    $exitCode = 1
 }
 finally {
     foreach ($n in $names) { [System.Environment]::SetEnvironmentVariable($n, $saved[$n], 'Process') }
 }
+exit $exitCode
