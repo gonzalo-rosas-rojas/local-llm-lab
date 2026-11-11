@@ -28,7 +28,8 @@ $llamaRoot = Join-Path $PSScriptRoot '..\tools\llamacpp'
 
 function Stop-LabProcess {
     [CmdletBinding(SupportsShouldProcess)]
-    param([string[]]$Name, [string]$Root, [string]$Label)
+    # -Force stops a process outside the lab folders without asking; this script never passes it.
+    param([string[]]$Name, [string]$Root, [string]$Label, [switch]$Force)
     $found = Get-LabProcess -Name $Name -Root @($Root)
     if (-not $found.Match -and -not $found.Other) {
         Write-Host "    $Label was not running." -ForegroundColor Yellow
@@ -45,8 +46,8 @@ function Stop-LabProcess {
         if (-not $where) { $where = 'path unreadable' }
         Write-Host "    Not stopped: $($o.Process.Name) (pid $($o.Process.Id)) runs from outside the lab folders ($where)." -ForegroundColor Yellow
         $ask = "Stop $($o.Process.Name) (pid $($o.Process.Id)) anyway?"
-        $yes = $false
-        try { $yes = $PSCmdlet.ShouldContinue($ask, 'Process outside the lab folders') } catch { $yes = $false }
+        $yes = $Force.IsPresent
+        if (-not $yes) { try { $yes = $PSCmdlet.ShouldContinue($ask, 'Process outside the lab folders') } catch { $yes = $false } }
         if ($yes) { Stop-Process -Id $o.Process.Id; Write-Host "    Stopped pid $($o.Process.Id)." -ForegroundColor Green }
     }
 }

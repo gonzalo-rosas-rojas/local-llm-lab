@@ -27,7 +27,7 @@ function Confirm-Equal {
         Write-Host "ok   $Name" -ForegroundColor Green
     }
 }
-function Confirm-Throws {
+function Confirm-Failure {
     param([scriptblock]$Block, [string]$Pattern, [string]$Name)
     try { & $Block; $script:failures++; Write-Host "FAIL $Name (no error)" -ForegroundColor Red }
     catch {
@@ -40,7 +40,7 @@ function Confirm-Throws {
 Confirm-Equal (Get-Median -Values @(3.0)) 3.0 'median of one value'
 Confirm-Equal (Get-Median -Values @(9.0, 1.0, 5.0)) 5.0 'median of three, unsorted'
 Confirm-Equal (Get-Median -Values @(4.0, 2.0, 8.0, 6.0)) 5.0 'median of four is the mean of the middle two'
-Confirm-Throws { Get-Median -Values @() } 'at least one' 'median of nothing'
+Confirm-Failure { Get-Median -Values @() } 'at least one' 'median of nothing'
 
 # Flags
 Confirm-Equal (Get-FlagValue -Flags @('-ngl', '99', '-fa', '1') -Name '-ngl') '99' 'flag value found'
@@ -51,8 +51,8 @@ Confirm-Equal (Get-FlagValue -Flags @('-fa') -Name '-fa') $null 'flag at the end
 Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf') @('-m', 'm.gguf', '-p', '512', '-n', '128', '-r', '1', '-o', 'json') 'default arguments'
 Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-ngl', '99', '-fa', '1') -Prompt 256 -Generate 64) `
     @('-m', 'm.gguf', '-p', '256', '-n', '64', '-r', '1', '-o', 'json', '-ngl', '99', '-fa', '1') 'arguments with flags'
-Confirm-Throws { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
-Confirm-Throws { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
 
 # Argument quoting
 Confirm-Equal (Join-NativeArgument -Arguments @('-m', 'a b.gguf', '-ngl', '99')) '-m "a b.gguf" -ngl 99' 'quotes an argument with a space'
