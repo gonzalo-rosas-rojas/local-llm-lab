@@ -10,7 +10,9 @@
     - --add-host host.docker.internal:host-gateway  lets the container talk to
       Ollama running on the HOST (localhost:11434).
     - The 'open-webui' volume keeps chats/users across restarts.
-    - --restart always  makes it start by itself when Docker starts.
+    - --restart unless-stopped  makes it start by itself when Docker starts, but not if you
+      stopped it (stop-lab.ps1 does), so what you turned off stays off after a Docker restart.
+      A container made with the earlier policy (always) keeps it until you recreate it.
     - A container created by an earlier version of this script keeps its old port
       binding: run  docker rm -f open-webui  and then this script again (the
       'open-webui' volume keeps chats and users).
@@ -60,7 +62,7 @@ try {
             '--add-host=host.docker.internal:host-gateway',
             '-v', 'open-webui:/app/backend/data',
             '--name', 'open-webui',
-            '--restart', 'always',
+            '--restart', 'unless-stopped',
             $Image
         )
         if ($r.ExitCode -ne 0) { throw "'docker run' failed (exit code $($r.ExitCode))." }
