@@ -32,9 +32,11 @@ $names = 'Path', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KE
 $saved = @{}
 foreach ($n in $names) { $saved[$n] = [System.Environment]::GetEnvironmentVariable($n, 'Process') }
 $exitCode = 0
+# num_ctx of the gpt-oss-cc variant: Claude Code needs far more context than Ollama's default.
+$ClaudeContextTokens = 32768
 
 try {
-    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    Sync-SessionPath
 
     # Ollama must be running
     try { Invoke-WebRequest 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 3 | Out-Null }
@@ -46,9 +48,9 @@ try {
         $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
         if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode))." }
         if (-not (Test-ModelListed -ListLines $list.Output -Tag 'gpt-oss-cc:latest')) {
-            Write-Host "Creating gpt-oss-cc (num_ctx 32768) from gpt-oss:20b..." -ForegroundColor Cyan
+            Write-Host "Creating gpt-oss-cc (num_ctx $ClaudeContextTokens) from gpt-oss:20b..." -ForegroundColor Cyan
             $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
-            "FROM gpt-oss:20b`nPARAMETER num_ctx 32768" | Set-Content -Path $mf -Encoding ascii
+            "FROM gpt-oss:20b`nPARAMETER num_ctx $ClaudeContextTokens" | Set-Content -Path $mf -Encoding ascii
             $create = Invoke-External -Exe 'ollama' -Arguments @('create', 'gpt-oss-cc', '-f', $mf) -Capture
             if ($create.ExitCode -ne 0) { throw "'ollama create gpt-oss-cc' failed (exit code $($create.ExitCode)). Is gpt-oss:20b downloaded? Run .\scripts\02-pull-models.ps1" }
         }

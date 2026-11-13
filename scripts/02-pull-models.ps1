@@ -40,7 +40,7 @@ function Install-OllamaModel {
 if ($MyInvocation.InvocationName -ne '.') {
     try {
         $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
-        if ($list.ExitCode -eq 127) { throw "ollama was not found. Run .\scripts\01-install-ollama.ps1 first." }
+        if ($list.ExitCode -eq $ExitCommandNotFound) { throw "ollama was not found. Run .\scripts\01-install-ollama.ps1 first." }
         if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode)). Is the server running? Try .\scripts\start-lab.ps1" }
 
         $failed = 0

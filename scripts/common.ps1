@@ -11,11 +11,21 @@
   other programs, so every external call goes through this function.
 #>
 
+# Exit code Invoke-External reports for a program that is not installed (the shell's "command not found").
+$ExitCommandNotFound = 127
+
+function Sync-SessionPath {
+    # Reloads PATH in this session from the machine and user values, so a program that was
+    # just installed is found without opening a new terminal.
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+                [System.Environment]::GetEnvironmentVariable('Path', 'User')
+}
+
 function Invoke-External {
     <#
       Runs a program and returns an object with ExitCode and Output (stdout lines).
       -Capture keeps stdout (stderr is discarded); without it the program's output goes
-      straight to the console. A program that is not installed gives ExitCode 127.
+      straight to the console. A program that is not installed gives $ExitCommandNotFound as ExitCode.
     #>
     param(
         [Parameter(Mandatory)][string]$Exe,
@@ -23,7 +33,7 @@ function Invoke-External {
         [switch]$Capture
     )
     if (-not (Get-Command $Exe -ErrorAction Ignore)) {
-        return [pscustomobject]@{ ExitCode = 127; Output = @() }
+        return [pscustomobject]@{ ExitCode = $ExitCommandNotFound; Output = @() }
     }
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
