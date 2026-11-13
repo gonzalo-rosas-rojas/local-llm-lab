@@ -63,6 +63,21 @@ function Get-StderrTail {
     return " Last stderr lines: $($tail -join ' | ')"
 }
 
+function Get-OllamaBaseUrl {
+    # Where the Ollama server listens (its default; see SECURITY.md).
+    return 'http://localhost:11434'
+}
+
+function Get-StarterModelTag {
+    # The fast starter model: 02-pull-models.ps1 downloads it and claude-local.ps1 uses it as the small model.
+    return 'qwen3:8b'
+}
+
+function Get-MainModelTag {
+    # The main model: 02-pull-models.ps1 downloads it and claude-local.ps1 builds its large-context variant from it.
+    return 'gpt-oss:20b'
+}
+
 function Get-OpenWebUiContainerName {
     # The Docker container (and volume) name Open WebUI runs under, shared by the scripts that
     # create, start and stop it.

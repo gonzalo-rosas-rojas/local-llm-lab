@@ -38,7 +38,7 @@ try {
 
     Write-Host "==> Testing the server on localhost:11434..." -ForegroundColor Cyan
     try {
-        $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 5
+        $r = Invoke-WebRequest -Uri "$(Get-OllamaBaseUrl)/api/version" -UseBasicParsing -TimeoutSec 5
         Write-Host "    Server OK: $($r.Content)" -ForegroundColor Green
     } catch {
         Write-Host "    The server did not answer yet: $($_.Exception.Message)" -ForegroundColor Yellow

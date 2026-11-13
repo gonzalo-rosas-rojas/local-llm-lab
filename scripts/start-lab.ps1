@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 $ollamaApp = Join-Path (Get-OllamaRoot) 'ollama app.exe'
 $ollamaExe = Join-Path (Get-OllamaRoot) 'ollama.exe'
-$ollamaVersionUrl = 'http://localhost:11434/api/version'
+$ollamaVersionUrl = (Get-OllamaBaseUrl) + '/api/version'
 $ollamaWaitSeconds = 20
 $ollamaProbeTimeoutSec = 2
 $webUiUrl = 'http://localhost:3000'
@@ -28,11 +28,14 @@ Write-Host "==> Ollama..." -ForegroundColor Cyan
 if (Test-Ollama) {
     Write-Host "    Already running." -ForegroundColor Green
 } else {
+    $launched = $true
     if (Test-Path $ollamaApp) { Start-Process $ollamaApp }
     elseif (Test-Path $ollamaExe) { Start-Process $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden }
-    else { Write-Host "    Ollama is not installed." -ForegroundColor Red }
-    for ($i = 0; $i -lt $ollamaWaitSeconds -and -not (Test-Ollama); $i++) { Start-Sleep -Seconds 1 }
-    if (Test-Ollama) { Write-Host "    Started." -ForegroundColor Green } else { Write-Host "    Not answering yet (check the tray)." -ForegroundColor Yellow }
+    else { Write-Host "    Ollama is not installed." -ForegroundColor Red; $launched = $false }
+    if ($launched) {
+        for ($i = 0; $i -lt $ollamaWaitSeconds -and -not (Test-Ollama); $i++) { Start-Sleep -Seconds 1 }
+        if (Test-Ollama) { Write-Host "    Started." -ForegroundColor Green } else { Write-Host "    Not answering yet (check the tray)." -ForegroundColor Yellow }
+    }
 }
 
 Write-Host "==> Open WebUI (only if Docker is running)..." -ForegroundColor Cyan
