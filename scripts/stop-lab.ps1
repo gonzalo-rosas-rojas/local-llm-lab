@@ -23,13 +23,12 @@ param()
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-$ollamaRoot = Join-Path $env:LOCALAPPDATA 'Programs\Ollama'
+$ollamaRoot = Get-OllamaRoot
 $llamaRoot = Join-Path $PSScriptRoot '..\tools\llamacpp'
 
 function Stop-LabProcess {
     [CmdletBinding(SupportsShouldProcess)]
-    # -Force stops a process outside the lab folders without asking; this script never passes it.
-    param([string[]]$Name, [string]$Root, [string]$Label, [switch]$Force)
+    param([string[]]$Name, [string]$Root, [string]$Label)
     $found = Get-LabProcess -Name $Name -Root @($Root)
     if (-not $found.Match -and -not $found.Other) {
         Write-Host "    $Label was not running." -ForegroundColor Yellow
@@ -42,12 +41,17 @@ function Stop-LabProcess {
         }
     }
     foreach ($o in $found.Other) {
+        # ShouldContinue ignores -WhatIf, so a dry run must not ask (or claim to have stopped anything).
+        if ($WhatIfPreference) {
+            Write-Host "    What if: would ask whether to stop $($o.Process.Name) (pid $($o.Process.Id))." -ForegroundColor Yellow
+            continue
+        }
         $where = $o.Path
         if (-not $where) { $where = 'path unreadable' }
         Write-Host "    Not stopped: $($o.Process.Name) (pid $($o.Process.Id)) runs from outside the lab folders ($where)." -ForegroundColor Yellow
         $ask = "Stop $($o.Process.Name) (pid $($o.Process.Id)) anyway?"
-        $yes = $Force.IsPresent
-        if (-not $yes) { try { $yes = $PSCmdlet.ShouldContinue($ask, 'Process outside the lab folders') } catch { $yes = $false } }
+        $yes = $false
+        try { $yes = $PSCmdlet.ShouldContinue($ask, 'Process outside the lab folders') } catch { $yes = $false }
         if ($yes) { Stop-Process -Id $o.Process.Id; Write-Host "    Stopped pid $($o.Process.Id)." -ForegroundColor Green }
     }
 }

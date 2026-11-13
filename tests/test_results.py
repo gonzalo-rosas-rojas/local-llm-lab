@@ -34,6 +34,10 @@ ORIGINAL_FIGURES = [
 ]
 
 
+# A sentence of the README's hand-written text that the generator must leave alone.
+STALE_PHRASE = "~13% faster"
+
+
 def record_files():
     return sorted(p for p in (ROOT / "results").glob("*.json") if p.name != "schema.json")
 
@@ -145,6 +149,15 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         for needle in ("qwen3:8b", "gpt-oss:20b", "Qwen3 8B", "Gemma 4 26B-A4B", "~113", "~34", "~76"):
             self.assertIn(needle, alt)
 
+    def test_chart_subtitle_says_run_counts_are_missing_only_while_they_are(self):
+        records = rr.load_records(ROOT)
+        self.assertIn("run counts are not recorded", rr.render_svg(records))
+        for r in records:
+            r["runs"] = 3
+        svg = rr.render_svg(records)
+        self.assertNotIn("run counts are not recorded", svg)
+        self.assertIn("Approximate figures (see results/).", svg)
+
     def test_chart_axis_covers_the_largest_bar(self):
         self.assertGreaterEqual(rr.nice_max(113), 113)
         self.assertEqual(rr.nice_max(113), 140)
@@ -190,8 +203,9 @@ class GeneratorBehaviour(unittest.TestCase):
     def test_check_fails_when_the_readme_is_edited_by_hand(self):
         tmp = self.make_repo()
         readme = tmp / "README.md"
-        readme.write_text(readme.read_text(encoding="utf-8").replace("~13% faster", "~50% faster"),
-                          encoding="utf-8")
+        text = readme.read_text(encoding="utf-8")
+        self.assertIn(STALE_PHRASE, text)
+        readme.write_text(text.replace(STALE_PHRASE, "~50% faster"), encoding="utf-8")
         self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 1)
 
     def test_text_outside_the_markers_is_preserved(self):
@@ -206,7 +220,8 @@ class GeneratorBehaviour(unittest.TestCase):
         tmp = self.make_repo()
         readme = tmp / "README.md"
         data = readme.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-        data = data.replace(b"~13% faster", b"~50% faster")
+        self.assertIn(STALE_PHRASE.encode(), data)
+        data = data.replace(STALE_PHRASE.encode(), b"~50% faster")
         readme.write_bytes(data)
         self.assertEqual(self.run_main("--root", str(tmp))[0], 0)
         self.assertIn(b"\r\n", readme.read_bytes())

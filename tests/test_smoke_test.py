@@ -3,9 +3,11 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -134,19 +136,19 @@ class ErrorMessages(unittest.TestCase):
         self.assertIn("ValueError", st.describe_error(ValueError("bad"), "u", "m"))
 
     def test_importing_the_module_does_not_import_openai(self):
-        self.assertNotIn("openai", sys.modules)
+        # A fresh interpreter: this process's sys.modules depends on what other tests imported.
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); import smoke_test; "
+                "print('openai' in sys.modules)")
+        proc = subprocess.run([sys.executable, "-c", code, str(ROOT / "clients")],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.strip(), "False")
 
     def test_missing_package_gives_install_hint(self):
-        saved = sys.modules.get("openai")
-        sys.modules["openai"] = None  # makes "from openai import OpenAI" raise ImportError
-        try:
+        # None in sys.modules makes "from openai import OpenAI" raise ImportError.
+        with unittest.mock.patch.dict(sys.modules, {"openai": None}):
             with self.assertRaises(RuntimeError) as ctx:
                 st.make_client("http://x/v1")
-        finally:
-            if saved is None:
-                del sys.modules["openai"]
-            else:
-                sys.modules["openai"] = saved
         self.assertIn("requirements.txt", str(ctx.exception))
 
 

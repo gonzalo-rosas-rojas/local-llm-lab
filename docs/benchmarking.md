@@ -36,6 +36,6 @@ A record written by the runner has `stage: null`, so [`tools/render_results.py`]
 
 ## What is tested, and what is not
 
-`bench/Test-RunBench.ps1` checks the median, the flag handling, the command construction, the argument quoting and the layout of the record, with values written in the test. `tests/test_bench_record.py` runs it and validates the record it emits against the schema.
+`bench/Test-RunBench.ps1` checks the median, the flag handling, the command construction, the argument quoting, the optional-field reading, the record id and the layout of the record, with values written in the test. `tests/test_bench_record.py` runs it and validates the record it emits against the schema.
 
 The conversion of `llama-bench`'s JSON output into those records (`ConvertFrom-BenchOutput`) has no test. It reads the fields `n_prompt`, `n_gen`, `avg_ts`, `build_number`, `build_commit` and `backends` of `llama-bench -o json`, as llama.cpp documents them, but this repository holds no real `llama-bench` output to test against, and an invented sample would only test the invention. The first real run is the test; if a field is missing, the runner stops and names it.

@@ -7,8 +7,8 @@
   process on its own except Invoke-Native.
 
   What is tested and what is not:
-    - Get-Median, Join-NativeArgument, Get-BenchArgumentList, Get-FlagValue and
-      Get-ResultRecord are tested with values written in the test itself.
+    - Get-Median, Join-NativeArgument, Get-BenchArgumentList, Get-FlagValue,
+      Get-OptionalField, Get-RecordId and Get-ResultRecord are tested with values written in the test itself.
     - ConvertFrom-BenchOutput is NOT tested. It reads llama-bench's JSON output
       (-o json) using the fields n_prompt, n_gen, avg_ts, build_number,
       build_commit and backends, as documented by llama.cpp, but this repository
@@ -95,6 +95,22 @@ function Invoke-Native {
     return [pscustomobject]@{ ExitCode = $proc.ExitCode; StdOut = $out; StdErr = $errTask.Result }
 }
 
+function Get-OptionalField {
+    # The field of a parsed JSON object as a string, or $null when the object lacks it.
+    param([Parameter(Mandatory)][object]$Object, [Parameter(Mandatory)][string]$Name)
+    if ($null -eq $Object.PSObject.Properties[$Name]) { return $null }
+    return [string]$Object.$Name
+}
+
+function Get-RecordId {
+    # Record id: 'bench-' + the UTC timestamp reduced to digits, T and Z, lowercased
+    # + the model file name without .gguf, lowercased, every other run of characters as '-'.
+    param([Parameter(Mandatory)][string]$TimestampUtc, [Parameter(Mandatory)][string]$ModelFile)
+    $stamp = ($TimestampUtc -replace '[^0-9TZ]', '').ToLower()
+    $slug = (($ModelFile -replace '\.gguf$', '') -replace '[^A-Za-z0-9]+', '-').ToLower().Trim('-')
+    return "bench-$stamp-$slug"
+}
+
 function ConvertFrom-BenchOutput {
     # llama-bench JSON (-o json) -> one object per prompt-only or generation-only test.
     # NOT covered by tests: see the header of this file.
@@ -109,12 +125,9 @@ function ConvertFrom-BenchOutput {
                 throw "llama-bench output has no '$field' field; this runner expects the JSON that llama.cpp documents for -o json."
             }
         }
-        $backends = $null
-        if ($null -ne $row.PSObject.Properties['backends']) { $backends = [string]$row.backends }
-        $buildNumber = $null
-        if ($null -ne $row.PSObject.Properties['build_number']) { $buildNumber = [string]$row.build_number }
-        $buildCommit = $null
-        if ($null -ne $row.PSObject.Properties['build_commit']) { $buildCommit = [string]$row.build_commit }
+        $backends = Get-OptionalField -Object $row -Name 'backends'
+        $buildNumber = Get-OptionalField -Object $row -Name 'build_number'
+        $buildCommit = Get-OptionalField -Object $row -Name 'build_commit'
         if ([int]$row.n_prompt -gt 0 -and [int]$row.n_gen -eq 0) {
             $name = 'prompt_processing_speed'; $label = "pp$([int]$row.n_prompt)"
         } elseif ([int]$row.n_gen -gt 0 -and [int]$row.n_prompt -eq 0) {
@@ -137,7 +150,7 @@ function Get-ResultRecord {
     # Label and Samples (one value per run, in run order).
     param(
         [Parameter(Mandatory)][string]$ModelFile,
-        [double]$ModelSizeGiB = -1,
+        [Nullable[double]]$ModelSizeGiB = $null,
         [string]$Build,
         [string]$Backend,
         [string[]]$Flags = @(),
@@ -151,7 +164,7 @@ function Get-ResultRecord {
     )
     $nullIfEmpty = { param($v) if ([string]::IsNullOrEmpty($v)) { $null } else { $v } }
     $ngl = Get-FlagValue -Flags $Flags -Name '-ngl'
-    $fa = Get-FlagValue -Flags $Flags -Name '-fa'
+    $flashAttentionFlag = Get-FlagValue -Flags $Flags -Name '-fa'
     $ctk = Get-FlagValue -Flags $Flags -Name '-ctk'
     $metrics = @()
     foreach ($s in $Series) {
@@ -167,14 +180,14 @@ function Get-ResultRecord {
         'Model parameters, quantization and context were not read from the model; they are null unless the flags state them.'
     ) + @($ExtraNotes)
     $sizeValue = $null
-    if ($ModelSizeGiB -ge 0) { $sizeValue = [math]::Round($ModelSizeGiB, 2) }
-    $fa1 = $null
-    if ($fa) { $fa1 = ($fa -ne '0') }
+    if ($null -ne $ModelSizeGiB) { $sizeValue = [math]::Round($ModelSizeGiB, 2) }
+    $flashAttention = $null
+    if ($flashAttentionFlag) { $flashAttention = ($flashAttentionFlag -ne '0') }
     $nglValue = $null
     if ($ngl) { $nglValue = [int]$ngl }
     return [ordered]@{
         schema_version = 1
-        id = 'bench-' + ($TimestampUtc -replace '[^0-9TZ]', '').ToLower() + '-' + (($ModelFile -replace '\.gguf$', '') -replace '[^A-Za-z0-9]+', '-').ToLower().Trim('-')
+        id = Get-RecordId -TimestampUtc $TimestampUtc -ModelFile $ModelFile
         stage = $null
         order = $null
         role = $null
@@ -189,7 +202,7 @@ function Get-ResultRecord {
         }
         parameters = [ordered]@{
             gpu_layers = $nglValue; gpu_offload = $null; context = $null
-            kv_cache_type = (& $nullIfEmpty $ctk); flash_attention = $fa1
+            kv_cache_type = (& $nullIfEmpty $ctk); flash_attention = $flashAttention
             flags = @($Flags)
         }
         metrics = @($metrics)

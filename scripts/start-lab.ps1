@@ -11,11 +11,14 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-$ollamaApp = "$env:LOCALAPPDATA\Programs\Ollama\ollama app.exe"
-$ollamaExe = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
+$ollamaApp = Join-Path (Get-OllamaRoot) 'ollama app.exe'
+$ollamaExe = Join-Path (Get-OllamaRoot) 'ollama.exe'
+$ollamaVersionUrl = 'http://localhost:11434/api/version'
+$ollamaWaitSeconds = 20
+$webUiUrl = 'http://localhost:3000'
 
 function Test-Ollama {
-    try { Invoke-WebRequest 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 2 | Out-Null; return $true }
+    try { Invoke-WebRequest $ollamaVersionUrl -UseBasicParsing -TimeoutSec 2 | Out-Null; return $true }
     catch { return $false }
 }
 
@@ -26,7 +29,7 @@ if (Test-Ollama) {
     if (Test-Path $ollamaApp) { Start-Process $ollamaApp }
     elseif (Test-Path $ollamaExe) { Start-Process $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden }
     else { Write-Host "    Ollama is not installed." -ForegroundColor Red }
-    for ($i = 0; $i -lt 20 -and -not (Test-Ollama); $i++) { Start-Sleep -Seconds 1 }
+    for ($i = 0; $i -lt $ollamaWaitSeconds -and -not (Test-Ollama); $i++) { Start-Sleep -Seconds 1 }
     if (Test-Ollama) { Write-Host "    Started." -ForegroundColor Green } else { Write-Host "    Not answering yet (check the tray)." -ForegroundColor Yellow }
 }
 
@@ -35,8 +38,8 @@ $docker = Invoke-External -Exe 'docker' -Arguments @('info') -Capture
 if ($docker.ExitCode -eq 0) {
     $start = Invoke-External -Exe 'docker' -Arguments @('start', 'open-webui') -Capture
     if ($start.ExitCode -eq 0) {
-        Write-Host "    Open WebUI -> http://localhost:3000" -ForegroundColor Green
-        Start-Process 'http://localhost:3000'
+        Write-Host "    Open WebUI -> $webUiUrl" -ForegroundColor Green
+        Start-Process $webUiUrl
     } else {
         Write-Host "    The 'open-webui' container could not be started (it may not exist yet: run .\scripts\03-start-openwebui.ps1)." -ForegroundColor Yellow
     }

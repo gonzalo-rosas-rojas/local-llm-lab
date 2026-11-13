@@ -3,15 +3,13 @@
 Skipped unless Windows PowerShell is available (the scripts target 5.1 on Windows).
 """
 import os
-import shutil
 import subprocess
-import sys
 import unittest
 from pathlib import Path
 
+from powershell_support import PS
+
 ROOT = Path(__file__).resolve().parent.parent
-# Windows PowerShell 5.1 is what the scripts target, so it is the one the tests use.
-PS = shutil.which("powershell") if sys.platform == "win32" else None
 
 PARSE = (
     "$bad = 0; "

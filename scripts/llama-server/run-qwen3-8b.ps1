@@ -16,14 +16,14 @@
                        tip: add " /no_think" to the prompt to answer directly)
 #>
 $ErrorActionPreference = 'Stop'
-$llama = Join-Path $PSScriptRoot '..\..\tools\llamacpp\llama-server.exe'
-$model = Join-Path $PSScriptRoot '..\..\models\gguf\Qwen3-8B-Q4_K_M.gguf'
+$llamaServerExe = Join-Path $PSScriptRoot '..\..\tools\llamacpp\llama-server.exe'
+$modelPath = Join-Path $PSScriptRoot '..\..\models\gguf\Qwen3-8B-Q4_K_M.gguf'
 
-if (-not (Test-Path $llama)) { Write-Host "llama-server is missing in tools\llamacpp (see docs/llama-cpp.md)." -ForegroundColor Red; exit 1 }
-if (-not (Test-Path $model)) { Write-Host "The GGUF is missing in models\gguf." -ForegroundColor Red; exit 1 }
+if (-not (Test-Path $llamaServerExe)) { Write-Host "llama-server is missing in tools\llamacpp (see docs/llama-cpp.md)." -ForegroundColor Red; exit 1 }
+if (-not (Test-Path $modelPath)) { Write-Host "The GGUF is missing in models\gguf." -ForegroundColor Red; exit 1 }
 
 Write-Host "llama-server -> http://localhost:8080   (Ctrl+C to stop)" -ForegroundColor Green
-& $llama -m $model -ngl 99 -fa 1 -c 8192 -ctk q8_0 -ctv q8_0 --jinja --host 127.0.0.1 --port 8080
+& $llamaServerExe -m $modelPath -ngl 99 -fa 1 -c 8192 -ctk q8_0 -ctv q8_0 --jinja --host 127.0.0.1 --port 8080
 if ($LASTEXITCODE -ne 0) {
     Write-Host "llama-server exited with code $LASTEXITCODE." -ForegroundColor Red
     exit $LASTEXITCODE

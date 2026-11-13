@@ -23,11 +23,10 @@ try {
     } else {
         Write-Host "==> Installing Ollama with winget..." -ForegroundColor Cyan
         $r = Invoke-External -Exe 'winget' -Arguments @('install', '--id', 'Ollama.Ollama', '-e', '--accept-package-agreements', '--accept-source-agreements')
-        if ($r.ExitCode -eq 127) { throw "winget was not found. Install Ollama from https://ollama.com/download and run this script again." }
+        if ($r.ExitCode -eq $ExitCommandNotFound) { throw "winget was not found. Install Ollama from https://ollama.com/download and run this script again." }
         if ($r.ExitCode -ne 0) { throw "winget failed to install Ollama (exit code $($r.ExitCode))." }
         # Refresh PATH in this session so 'ollama' is found without reopening the terminal
-        $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
-                    [System.Environment]::GetEnvironmentVariable('Path','User')
+        Sync-SessionPath
         if (-not (Get-Command ollama -ErrorAction Ignore)) {
             throw "winget reported success but 'ollama' is not on the PATH yet. Open a new terminal and run this script again."
         }
