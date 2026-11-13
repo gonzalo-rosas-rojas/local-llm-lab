@@ -27,7 +27,7 @@ Nothing is published to the local network or the internet. Open WebUI's own quic
 .\scripts\check-loopback.ps1
 ```
 
-The script reads the ports from the lab's scripts, lists the TCP listeners on them with `Get-NetTCPConnection`, and exits with code 1, naming the owning process, if any listens on an address that is not loopback (for example `0.0.0.0` or `::`). It is read-only. A port with no listener is fine: it means that part of the lab is off.
+The script reads the ports from the lab's scripts, lists the TCP listeners on them with `Get-NetTCPConnection`, and exits with code 1, naming the owning process, if any listens on an address that is not loopback (for example `0.0.0.0` or `::`). It is read-only. A port with no listener is fine: it means that part of the lab is off. If the query itself fails, the check stops with exit code 2 and the reason instead of reporting the port as free.
 
 ## The `ollama` key
 

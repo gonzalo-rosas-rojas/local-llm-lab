@@ -116,6 +116,26 @@ function Test-LoopbackAddress {
     return [System.Net.IPAddress]::IsLoopback($ip)
 }
 
+function Get-ListenerOnPort {
+    <#
+      The TCP listeners on a port. Get-NetTCPConnection reports "nothing matches" as an
+      ObjectNotFound error: that means no listener and gives an empty list. Any other
+      failure is not an answer, so it stops the caller with the reason (a security check
+      must not read "could not look" as "nobody is listening"). -Query is the lookup,
+      replaceable in tests; it receives the port.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$Port,
+        [scriptblock]$Query = { param($p) Get-NetTCPConnection -State Listen -LocalPort $p -ErrorAction Stop }
+    )
+    try {
+        return @(& $Query $Port)
+    } catch {
+        if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return @() }
+        throw "Could not query the listeners on port ${Port}: $($_.Exception.Message)"
+    }
+}
+
 function Get-LabPort {
     # Ports the lab's scripts mention: host:port after localhost or 127.0.0.1, and --port N.
     param([Parameter(Mandatory)][string[]]$ScriptPath)
