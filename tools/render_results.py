@@ -315,12 +315,12 @@ def alt_text(records):
 
 def summary_block(records):
     cpu, fit, _ = moe_gain(records)
-    moe = by_id(records, ID_GEMMA_FIT)
+    fit_record = by_id(records, ID_GEMMA_FIT)
     return "\n".join([
         f"![{alt_text(records)}]({SVG_REF})",
         "",
-        f"**Main finding:** with {moe['model']['name']}, a mixture-of-experts model that does not "
-        f"fit in {num(moe['hardware']['vram_gb'])} GB of VRAM, generation went from {shown(cpu)} to {shown(fit)} tok/s "
+        f"**Main finding:** with {fit_record['model']['name']}, a mixture-of-experts model that does not "
+        f"fit in {num(fit_record['hardware']['vram_gb'])} GB of VRAM, generation went from {shown(cpu)} to {shown(fit)} tok/s "
         "when the experts were placed in VRAM first and only the remainder in system RAM, "
         "instead of all in RAM.",
         "Why that works, and its limits: [MoE offload notes](docs/moe-offload.md).",
