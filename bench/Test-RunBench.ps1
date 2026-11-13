@@ -87,6 +87,8 @@ $row = '{"build_number": 4321, "backends": "CUDA"}' | ConvertFrom-Json
 Confirm-Equal (Get-OptionalField -Object $row -Name 'build_number') '4321' 'a present field comes back as text'
 Confirm-Equal (Get-OptionalField -Object $row -Name 'backends') 'CUDA' 'a present text field'
 Confirm-Equal (Get-OptionalField -Object $row -Name 'build_commit') $null 'an absent field is null'
+
+# Record id
 Confirm-Equal (Get-RecordId -TimestampUtc '2000-01-02T03:04:05Z' -ModelFile 'A_b.c-D.gguf') 'bench-20000102t030405z-a-b-c-d' 'record id slug'
 
 if ($EmitSample) {
