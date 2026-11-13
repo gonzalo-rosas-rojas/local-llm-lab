@@ -149,6 +149,13 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         for needle in ("qwen3:8b", "gpt-oss:20b", "Qwen3 8B", "Gemma 4 26B-A4B", "~113", "~34", "~76"):
             self.assertIn(needle, alt)
 
+    def test_chart_subtitle_says_run_counts_are_missing_only_while_they_are(self):
+        records = rr.load_records(ROOT)
+        self.assertIn("run counts are not recorded", rr.render_svg(records))
+        for r in records:
+            r["runs"] = 3
+        self.assertNotIn("run counts are not recorded", rr.render_svg(records))
+
     def test_chart_axis_covers_the_largest_bar(self):
         self.assertGreaterEqual(rr.nice_max(113), 113)
         self.assertEqual(rr.nice_max(113), 140)

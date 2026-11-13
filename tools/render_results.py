@@ -12,6 +12,7 @@ everything outside the markers is hand-written and is never touched.
 """
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -19,7 +20,7 @@ from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent.parent
 SVG_PATH = Path("docs/img/tokens-per-second.svg")
-SVG_REF = "docs/img/tokens-per-second.svg"
+SVG_REF = SVG_PATH.as_posix()
 
 # Record ids the prose below compares against each other.
 ID_OLLAMA_QWEN = "stage1-ollama-qwen3-8b"
@@ -183,7 +184,7 @@ def stage1_section(records):
 
 def with_unit_vram(record):
     m = metric(record, "vram")
-    return f"{shown(m)} {m['unit']}" if m else None
+    return with_unit(m) if m else None
 
 
 def stage2_section(records):
@@ -314,11 +315,12 @@ def alt_text(records):
 
 def summary_block(records):
     cpu, fit, _ = moe_gain(records)
+    moe = by_id(records, ID_GEMMA_FIT)
     return "\n".join([
         f"![{alt_text(records)}]({SVG_REF})",
         "",
-        f"**Main finding:** with Gemma 4 26B-A4B, a mixture-of-experts model that does not "
-        f"fit in 16 GB of VRAM, generation went from {shown(cpu)} to {shown(fit)} tok/s "
+        f"**Main finding:** with {moe['model']['name']}, a mixture-of-experts model that does not "
+        f"fit in {num(moe['hardware']['vram_gb'])} GB of VRAM, generation went from {shown(cpu)} to {shown(fit)} tok/s "
         "when the experts were placed in VRAM first and only the remainder in system RAM, "
         "instead of all in RAM.",
         "Why that works, and its limits: [MoE offload notes](docs/moe-offload.md).",
@@ -376,9 +378,14 @@ CSS = """\
     }"""
 
 
+# The chart's value axis: a tick every TICK_STEP tok/s, and room above the tallest bar.
+TICK_STEP = 20
+AXIS_HEADROOM = 1.15
+
+
 def nice_max(top):
-    step = 20
-    return int(-(-top * 1.15 // step) * step)
+    """The axis maximum: `top` plus headroom, rounded up to a tick."""
+    return math.ceil(top * AXIS_HEADROOM / TICK_STEP) * TICK_STEP
 
 
 def render_svg(records):
@@ -399,14 +406,16 @@ def render_svg(records):
     height = axis_y + 82
     values = [metric(r, "generation_speed")["value"] for r in rows]
     vmax = nice_max(max(values))
-    ticks = list(range(0, vmax + 1, 20))
+    ticks = list(range(0, vmax + 1, TICK_STEP))
 
     def x_of(v):
         return left + plot_w * v / vmax
 
     first_hw = rows[0]["hardware"]
-    subtitle = (f"{first_hw['gpu']}, {num(first_hw['vram_gb'])} GB VRAM. "
-                "Approximate figures; run counts are not recorded (see results/).")
+    runs_unrecorded = any(r["runs"] is None for r in rows)
+    subtitle = (f"{first_hw['gpu']}, {num(first_hw['vram_gb'])} GB VRAM. Approximate figures; "
+                + ("run counts are not recorded " if runs_unrecorded else "")
+                + "(see results/).")
     title = "Generation speed in tokens per second (higher is better)"
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -470,7 +479,7 @@ def build(root):
     return {
         "README.md": render_readme(readme, records),
         "results/README.md": render_results_readme(results_readme, records),
-        str(SVG_PATH).replace("\\", "/"): render_svg(records),
+        SVG_PATH.as_posix(): render_svg(records),
     }
 
 
