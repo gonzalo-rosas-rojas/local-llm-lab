@@ -224,8 +224,8 @@ def parse_args(argv):
 
 
 def print_summary(summary):
-    runs = summary["runs"]
     """Print the two headline numbers of a measured session."""
+    runs = summary["runs"]
     print(f"TTFT, median of {runs}: {summary['ttft_median']:.2f} s")
     if summary["speed_unit"] is None:
         print("Generation speed: not available (runs too short to time)")

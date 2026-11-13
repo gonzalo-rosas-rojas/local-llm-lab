@@ -472,7 +472,7 @@ def render_svg(records):
         if r["chart"]["series"] not in series:
             series.append(r["chart"]["series"])
     if len(series) > MAX_SERIES:
-        raise ValueError("the chart palette has two series")
+        raise ValueError(f"the chart palette has {MAX_SERIES} series")
     width = 800
     left, right = 250, 40
     plot_w = width - left - right
