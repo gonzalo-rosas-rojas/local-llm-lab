@@ -153,6 +153,13 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         self.assertNotIn("run counts are not recorded", svg)
         self.assertIn("Approximate figures (see results/).", svg)
 
+    def test_a_chart_with_no_chart_records_says_so(self):
+        records = rr.load_records(ROOT)
+        for r in records:
+            r["chart"] = None
+        with self.assertRaisesRegex(ValueError, "chart"):
+            rr.render_svg(records)
+
     def test_chart_axis_covers_the_largest_bar(self):
         self.assertGreaterEqual(rr.nice_max(113), 113)
         self.assertEqual(rr.nice_max(113), 140)
