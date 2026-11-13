@@ -40,17 +40,21 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib.ps1')
 if (-not $LlamaBench) { $LlamaBench = Join-Path $PSScriptRoot '..\tools\llamacpp\llama-bench.exe' }
 
+# nvidia-smi reports memory in MiB.
+$MibPerGib = 1024
+
 function Get-Hardware {
     $info = @{ Gpu = $null; VramGb = $null; Driver = $null; RamGb = $null; Cpu = $null; Os = $null; Notes = @() }
     $smi = Get-Command nvidia-smi -ErrorAction Ignore
     if ($smi) {
         $r = Invoke-Native -Exe $smi.Source -Arguments @('--query-gpu=name,driver_version,memory.total', '--format=csv,noheader,nounits')
         if ($r.ExitCode -eq 0 -and $r.StdOut.Trim()) {
-            $f = ($r.StdOut.Trim() -split "`r?`n")[0] -split ',\s*'
-            if ($f.Count -ge 3) {
-                $info.Gpu = $f[0].Trim()
-                $info.Driver = $f[1].Trim()
-                $info.VramGb = [math]::Round([double]$f[2] / 1024, 1)
+            $csvFields = ($r.StdOut.Trim() -split "`r?`n")[0] -split ',\s*'
+            if ($csvFields.Count -ge 3) {
+                $memoryMiB = [double]$csvFields[2]
+                $info.Gpu = $csvFields[0].Trim()
+                $info.Driver = $csvFields[1].Trim()
+                $info.VramGb = [math]::Round($memoryMiB / $MibPerGib, 1)
             }
         }
     }
@@ -60,7 +64,7 @@ function Get-Hardware {
         $info.Cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
         $info.Os = (Get-CimInstance Win32_OperatingSystem).Caption.Trim()
     } catch {
-        $info.Notes += 'CPU, RAM and operating system could not be read (Get-CimInstance failed).'
+        $info.Notes += "CPU, RAM and operating system could not be read (Get-CimInstance failed): $($_.Exception.Message)"
     }
     return $info
 }
@@ -120,8 +124,7 @@ try {
     $size = (Get-Item -LiteralPath $Model).Length / 1GB
     $record = Get-ResultRecord -ModelFile ([System.IO.Path]::GetFileName($Model)) -ModelSizeGiB $size `
         -Build $build -Backend $backend -Flags $Flags -Command $command -Series @($series) -Runs $Runs `
-        -TimestampUtc $timestampUtc -Gpu $hw.Gpu -VramGb $hw.VramGb -RamGb $hw.RamGb -Cpu $hw.Cpu `
-        -Os $hw.Os -Driver $hw.Driver `
+        -TimestampUtc $timestampUtc -Hardware $hw `
         -ExtraNotes (@('size_gb is the file size in GiB (bytes / 1024^3).') + $hw.Notes)
 
     $json = ($record | ConvertTo-Json -Depth 8) + "`n"
