@@ -3,7 +3,6 @@
 Skipped unless Windows PowerShell is available (the scripts target 5.1 on Windows).
 """
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,9 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 import render_results as rr  # noqa: E402
-
-# Windows PowerShell 5.1 is what the scripts target, so it is the one the tests use.
-PS = shutil.which("powershell") if sys.platform == "win32" else None
+from powershell_support import PS  # noqa: E402
 
 
 @unittest.skipUnless(PS, "Windows PowerShell is not available")

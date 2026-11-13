@@ -34,6 +34,10 @@ ORIGINAL_FIGURES = [
 ]
 
 
+# A sentence of the README's hand-written text that the generator must leave alone.
+STALE_PHRASE = "~13% faster"
+
+
 def record_files():
     return sorted(p for p in (ROOT / "results").glob("*.json") if p.name != "schema.json")
 
@@ -190,8 +194,9 @@ class GeneratorBehaviour(unittest.TestCase):
     def test_check_fails_when_the_readme_is_edited_by_hand(self):
         tmp = self.make_repo()
         readme = tmp / "README.md"
-        readme.write_text(readme.read_text(encoding="utf-8").replace("~13% faster", "~50% faster"),
-                          encoding="utf-8")
+        text = readme.read_text(encoding="utf-8")
+        self.assertIn(STALE_PHRASE, text)
+        readme.write_text(text.replace(STALE_PHRASE, "~50% faster"), encoding="utf-8")
         self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 1)
 
     def test_text_outside_the_markers_is_preserved(self):
@@ -206,7 +211,8 @@ class GeneratorBehaviour(unittest.TestCase):
         tmp = self.make_repo()
         readme = tmp / "README.md"
         data = readme.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-        data = data.replace(b"~13% faster", b"~50% faster")
+        self.assertIn(STALE_PHRASE.encode(), data)
+        data = data.replace(STALE_PHRASE.encode(), b"~50% faster")
         readme.write_bytes(data)
         self.assertEqual(self.run_main("--root", str(tmp))[0], 0)
         self.assertIn(b"\r\n", readme.read_bytes())
