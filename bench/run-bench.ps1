@@ -98,8 +98,7 @@ try {
     $command = Join-NativeArgument -Arguments (@($LlamaBench) + $benchArgs)
     Write-Host "==> $Runs run(s): $command" -ForegroundColor Cyan
 
-    $samples = @{}      # label -> list of values, in run order
-    $meta = @{}         # label -> Name
+    $seriesByLabel = @{}    # label -> object with Name, Label and Samples (values in run order)
     $build = $null; $backend = $null
     for ($i = 1; $i -le $Runs; $i++) {
         Write-Host "    run $i of $Runs..." -ForegroundColor Cyan
@@ -109,17 +108,17 @@ try {
             throw "llama-bench exited with code $($r.ExitCode) on run $i. Last stderr lines: $tail"
         }
         foreach ($t in (ConvertFrom-BenchOutput -JsonText $r.StdOut)) {
-            if (-not $samples.ContainsKey($t.Label)) { $samples[$t.Label] = @(); $meta[$t.Label] = $t.Name }
-            $samples[$t.Label] += $t.Value
+            if (-not $seriesByLabel.ContainsKey($t.Label)) {
+                $seriesByLabel[$t.Label] = [pscustomobject]@{ Name = $t.Name; Label = $t.Label; Samples = @() }
+            }
+            $seriesByLabel[$t.Label].Samples += $t.Value
             if (-not $build -and $t.BuildNumber) { $build = 'b' + $t.BuildNumber }
             if (-not $build -and $t.BuildCommit) { $build = $t.BuildCommit }
             if (-not $backend -and $t.Backends) { $backend = $t.Backends }
         }
     }
 
-    $series = foreach ($label in ($samples.Keys | Sort-Object)) {
-        [pscustomobject]@{ Name = $meta[$label]; Label = $label; Samples = $samples[$label] }
-    }
+    $series = foreach ($label in ($seriesByLabel.Keys | Sort-Object)) { $seriesByLabel[$label] }
     $hw = Get-Hardware
     $size = (Get-Item -LiteralPath $Model).Length / 1GB
     $record = Get-ResultRecord -ModelFile ([System.IO.Path]::GetFileName($Model)) -ModelSizeGiB $size `

@@ -48,11 +48,20 @@ Confirm-Equal (Get-FlagValue -Flags @('-ngl', '99') -Name '-fa') $null 'flag val
 Confirm-Equal (Get-FlagValue -Flags @('-fa') -Name '-fa') $null 'flag at the end has no value'
 
 # Command construction
-Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf') @('-m', 'm.gguf', '-p', '512', '-n', '128', '-r', '1', '-o', 'json') 'default arguments'
+Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128) @('-m', 'm.gguf', '-p', '512', '-n', '128', '-r', '1', '-o', 'json') 'arguments without flags'
 Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-ngl', '99', '-fa', '1') -Prompt 256 -Generate 64) `
     @('-m', 'm.gguf', '-p', '256', '-n', '64', '-r', '1', '-o', 'json', '-ngl', '99', '-fa', '1') 'arguments with flags'
-Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
-Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128 -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128 -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
+
+# The default sizes live in run-bench.ps1's param block alone: read them from its syntax tree, without running it.
+$runBench = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'run-bench.ps1'), [ref]$null, [ref]$null)
+$defaultOf = @{}
+foreach ($parameter in $runBench.ParamBlock.Parameters) {
+    if ($parameter.DefaultValue) { $defaultOf[$parameter.Name.VariablePath.UserPath] = $parameter.DefaultValue.Extent.Text }
+}
+Confirm-Equal $defaultOf['Prompt'] '512' 'run-bench.ps1 measures a 512-token prompt by default'
+Confirm-Equal $defaultOf['Generate'] '128' 'run-bench.ps1 generates 128 tokens by default'
 
 # Argument quoting
 Confirm-Equal (Join-NativeArgument -Arguments @('-m', 'a b.gguf', '-ngl', '99')) '-m "a b.gguf" -ngl 99' 'quotes an argument with a space'

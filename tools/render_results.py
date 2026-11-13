@@ -346,18 +346,21 @@ def replace_block(text, name, body, filename="README.md"):
     return pattern.sub(lambda _m: replacement, text)
 
 
+def render_blocks(text, blocks, records, filename):
+    """Return `text` (LF newlines) with each generated block of `blocks` rewritten."""
+    for name, fn in blocks.items():
+        text = replace_block(text, name, fn(records), filename)
+    return text
+
+
 def render_results_readme(text, records):
     """Return results/README.md (LF newlines) with its generated block rewritten."""
-    for name, fn in RESULTS_README_BLOCKS.items():
-        text = replace_block(text, name, fn(records), "results/README.md")
-    return text
+    return render_blocks(text, RESULTS_README_BLOCKS, records, "results/README.md")
 
 
 def render_readme(text, records):
-    """Return `text` (LF newlines) with every generated block rewritten."""
-    for name, fn in BLOCKS.items():
-        text = replace_block(text, name, fn(records))
-    return text
+    """Return README.md (LF newlines) with every generated block rewritten."""
+    return render_blocks(text, BLOCKS, records, "README.md")
 
 
 # ----------------------------------------------------------------------- SVG
@@ -385,6 +388,12 @@ CSS = """\
 # The chart's value axis: a tick every TICK_STEP tok/s, and room above the tallest bar.
 TICK_STEP = 20
 AXIS_HEADROOM = 1.15
+# The palette (CSS .s0 and .s1) has two series colours.
+MAX_SERIES = 2
+# Below the axis: the legend sits LEGEND_OFFSET_PX under it and the SVG ends FOOTER_PX under it,
+# so the footer must stay taller than the legend.
+LEGEND_OFFSET_PX = 64
+FOOTER_PX = 82
 
 
 def nice_max(top):
@@ -444,7 +453,7 @@ def _bar_lines(plot, rows, series):
 
 
 def _legend_lines(plot, series):
-    ly = plot.axis_y + 64
+    ly = plot.axis_y + LEGEND_OFFSET_PX
     out = []
     lx = plot.left
     for i, name in enumerate(series):
@@ -462,8 +471,8 @@ def render_svg(records):
     for r in rows:
         if r["chart"]["series"] not in series:
             series.append(r["chart"]["series"])
-    if len(series) > 2:
-        raise ValueError("the chart palette has two series")
+    if len(series) > MAX_SERIES:
+        raise ValueError(f"the chart palette has {MAX_SERIES} series")
     width = 800
     left, right = 250, 40
     plot_w = width - left - right
@@ -471,7 +480,7 @@ def render_svg(records):
     row_h = 46
     bar_h = 26
     axis_y = top + row_h * len(rows)
-    height = axis_y + 82
+    height = axis_y + FOOTER_PX
     values = [metric(r, "generation_speed")["value"] for r in rows]
     vmax = nice_max(max(values))
     ticks = list(range(0, vmax + 1, TICK_STEP))

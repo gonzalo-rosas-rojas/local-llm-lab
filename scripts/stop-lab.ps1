@@ -61,7 +61,7 @@ Write-Host "==> Stopping Open WebUI..." -ForegroundColor Cyan
 if ($PSCmdlet.ShouldProcess($webUiContainer, 'docker stop')) {
     $r = Invoke-External -Exe 'docker' -Arguments @('stop', $webUiContainer) -Capture
     if ($r.ExitCode -eq 0) { Write-Host "    Container stopped." -ForegroundColor Green }
-    else { Write-Host "    It was not running (or Docker is off)." -ForegroundColor Yellow }
+    else { Write-Host "    It was not running (or Docker is off).$(Get-StderrTail -Result $r)" -ForegroundColor Yellow }
 }
 
 Write-Host "==> Stopping Ollama..." -ForegroundColor Cyan

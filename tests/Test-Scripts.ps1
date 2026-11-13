@@ -59,6 +59,7 @@ Confirm-Equal (Test-LoopbackAddress -Address '::ffff:10.0.0.1') $false 'IPv4-map
 Confirm-Equal (Test-LoopbackAddress -Address 'not-an-address') $false 'garbage is not loopback'
 
 # Ports are read from the scripts, not typed in again.
+$labPorts = @(3000, 8080, 11434)  # Open WebUI, llama-server, Ollama
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('lab-ports-' + [guid]::NewGuid().ToString('N') + '.ps1')
 try {
     Set-Content -LiteralPath $tmp -Value @(
@@ -66,13 +67,13 @@ try {
         '& $llama -m $m --host 127.0.0.1 --port 8080',
         '-p 127.0.0.1:3000:8080'
     )
-    Confirm-Equal (Get-LabPort -ScriptPath $tmp) @(3000, 8080, 11434) 'ports found in a script, container-side port ignored'
+    Confirm-Equal (Get-LabPort -ScriptPath $tmp) $labPorts 'ports found in a script, container-side port ignored'
 } finally {
     Remove-Item -LiteralPath $tmp -ErrorAction Ignore
 }
 # check-loopback.ps1 is left out, as it does itself: it is the checker, not something the lab starts.
 $labScripts = @(Get-ChildItem -Path (Join-Path $PSScriptRoot '..\scripts') -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'check-loopback.ps1' } | ForEach-Object { $_.FullName })
-Confirm-Equal (Get-LabPort -ScriptPath $labScripts) @(3000, 8080, 11434) 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
+Confirm-Equal (Get-LabPort -ScriptPath $labScripts) $labPorts 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
 
 # The container name the three Open WebUI scripts share.
 Confirm-Equal (Get-OpenWebUiContainerName) 'open-webui' 'Open WebUI container name'
@@ -87,9 +88,9 @@ $failure = $null
 try { [void](Get-ListenerOnPort -Port 8080 -Query $broken) } catch { $failure = $_.Exception.Message }
 Confirm-Equal ($failure -like '*port 8080*access denied by the fake query*') $true 'a failed query throws with the port and the reason'
 
-# External programs: exit codes come back, stderr does not throw, a missing program is 127.
+# External programs: exit codes come back, stderr does not throw, a missing program gives the not-found code.
 $missing = Invoke-External -Exe 'definitely-not-installed-xyz'
-Confirm-Equal $missing.ExitCode 127 'missing program gives 127'
+Confirm-Equal $missing.ExitCode $ExitCommandNotFound 'missing program gives the not-found code'
 $failing = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'exit 3')
 Confirm-Equal $failing.ExitCode 3 'exit code is returned'
 $noisy = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'echo to-stdout & echo to-stderr 1>&2 & exit 2') -Capture

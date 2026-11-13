@@ -97,13 +97,17 @@ class RunOnce(unittest.TestCase):
             st.run_once(client, "m", "p", clock=FakeClock([0.0, 1.0]))
 
 
+class APIConnectionError(Exception):
+    """Stands in for the SDK's error of the same name: describe_error recognises it by name."""
+
+
 class Measure(unittest.TestCase):
     def test_median_over_runs_and_warmup_is_discarded(self):
         # warm-up run, then three runs with 10, 40 and 20 tok/s
         def stream(n):
             return [text_chunk("a"), usage_chunk(n)]
         client = FakeClient([stream(999), stream(11), stream(41), stream(21)])
-        times = [0, 1, 2] + [0, 1, 2] + [0, 1, 2] + [0, 1, 2]  # warm-up then 3 runs, each 1 s of generation
+        times = [0, 1, 2] * 4  # warm-up then 3 runs, each 1 s of generation
         summary = st.measure(client, "m", "p", runs=3, warmup=1, clock=FakeClock(times))
         self.assertEqual(len(client.calls), 4)
         self.assertEqual(summary["speed_samples"], [10.0, 40.0, 20.0])
@@ -118,8 +122,6 @@ class Measure(unittest.TestCase):
 
 class ErrorMessages(unittest.TestCase):
     def test_connection_error_names_the_url(self):
-        class APIConnectionError(Exception):
-            pass
         msg = st.describe_error(APIConnectionError("boom"), "http://x/v1", "m")
         self.assertIn("http://x/v1", msg)
         self.assertNotIn("\n", msg)
@@ -168,8 +170,6 @@ class Main(unittest.TestCase):
         self.assertIn("median of 2", out)
 
     def test_unreachable_server_is_one_line_and_nonzero(self):
-        class APIConnectionError(Exception):
-            pass
         code, out, err = self.run_main(["m"], FakeClient(error=APIConnectionError("refused")))
         self.assertEqual(code, 1)
         self.assertEqual(len(err.strip().splitlines()), 1)
@@ -206,9 +206,9 @@ class Main(unittest.TestCase):
             self.assertEqual(code, 0, err)
             record = json.loads(Path(path).read_text(encoding="utf-8"))
         self.assertEqual(rr.validate(record, rr.load_schema(ROOT)), [])
-        names = {m["name"]: m for m in record["metrics"]}
-        self.assertEqual(names["generation_speed"]["unit"], "tok/s")
-        self.assertEqual(len(names["generation_speed"]["samples"]), 3)
+        metrics_by_name = {m["name"]: m for m in record["metrics"]}
+        self.assertEqual(metrics_by_name["generation_speed"]["unit"], "tok/s")
+        self.assertEqual(len(metrics_by_name["generation_speed"]["samples"]), 3)
         self.assertEqual(record["runs"], 3)
         self.assertIsNone(record["engine"]["version"])
 
@@ -221,8 +221,8 @@ class Main(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("chunks/s", out)
         self.assertEqual(rr.validate(record, rr.load_schema(ROOT)), [])
-        gen = [m for m in record["metrics"] if m["name"] == "generation_speed"][0]
-        self.assertEqual(gen["unit"], "chunks/s")
+        generation_metric = [m for m in record["metrics"] if m["name"] == "generation_speed"][0]
+        self.assertEqual(generation_metric["unit"], "chunks/s")
 
     def test_no_output_file_is_left_when_the_run_fails(self):
         with tempfile.TemporaryDirectory() as tmp:

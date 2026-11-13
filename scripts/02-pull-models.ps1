@@ -45,10 +45,10 @@ if ($MyInvocation.InvocationName -ne '.') {
 
         $failed = 0
         # Fast starter: validates the pipeline in minutes (~89 tok/s, 100% GPU)
-        if (-not (Install-OllamaModel -Tag 'qwen3:8b' -Note 'starter ~5GB, fast iteration' -ListLines $list.Output)) { $failed++ }
+        if (-not (Install-OllamaModel -Tag (Get-StarterModelTag) -Note 'starter ~5GB, fast iteration' -ListLines $list.Output)) { $failed++ }
 
         # Quality main model that FITS 100% on the GPU (~113 tok/s, 100% GPU)
-        if (-not (Install-OllamaModel -Tag 'gpt-oss:20b' -Note 'main ~13GB, MoE with 3.6B active, fits entirely' -ListLines $list.Output)) { $failed++ }
+        if (-not (Install-OllamaModel -Tag (Get-MainModelTag) -Note 'main ~13GB, MoE with 3.6B active, fits entirely' -ListLines $list.Output)) { $failed++ }
 
         # Stage 3 (MoE offload, a model that does not fit in 16GB) does not use an Ollama tag:
         # its GGUF and launcher are described in docs/moe-offload.md.

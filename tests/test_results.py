@@ -40,6 +40,10 @@ STALE_PHRASE = "~13% faster"
 EDITED_PHRASE = "~50% faster"
 
 
+def read_record(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def record_files():
     return sorted(p for p in (ROOT / "results").glob("*.json") if p.name != "schema.json")
 
@@ -58,14 +62,14 @@ class RecordsMatchSchema(unittest.TestCase):
     def test_every_record_validates(self):
         for path in record_files():
             with self.subTest(path.name):
-                record = json.loads(path.read_text(encoding="utf-8"))
+                record = read_record(path)
                 self.assertEqual(rr.validate(record, self.schema), [])
                 self.assertEqual(record["id"], path.stem)
 
     def test_unrecorded_fields_are_explained_in_notes(self):
         for path in record_files():
             with self.subTest(path.name):
-                record = json.loads(path.read_text(encoding="utf-8"))
+                record = read_record(path)
                 notes = " ".join(record["notes"]).lower()
                 if record["runs"] is None:
                     self.assertIn("runs", notes)
@@ -93,7 +97,7 @@ class RecordsMatchSchema(unittest.TestCase):
                     self.assertIn(rr.shown(m), source)
 
     def test_validator_rejects_bad_records(self):
-        good = json.loads(record_files()[0].read_text(encoding="utf-8"))
+        good = read_record(record_files()[0])
 
         def corrupt(edit):
             bad = copy.deepcopy(good)
@@ -114,7 +118,7 @@ class RecordsMatchSchema(unittest.TestCase):
                 self.assertNotEqual(rr.validate(record, self.schema), [])
 
     def test_null_is_accepted_where_the_schema_allows_it(self):
-        good = json.loads(record_files()[0].read_text(encoding="utf-8"))
+        good = read_record(record_files()[0])
         good["engine"]["version"] = None
         good["runs"] = None
         self.assertEqual(rr.validate(good, self.schema), [])
@@ -175,6 +179,9 @@ class GeneratorBehaviour(unittest.TestCase):
         shutil.copy(ROOT / rr.SVG_PATH, tmp / rr.SVG_PATH)
         return tmp
 
+    def check(self, tmp):
+        return self.run_main("--check", "--root", str(tmp))
+
     def run_main(self, *args):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
@@ -183,23 +190,23 @@ class GeneratorBehaviour(unittest.TestCase):
 
     def test_check_passes_on_a_current_copy(self):
         tmp = self.make_repo()
-        code, _, _ = self.run_main("--check", "--root", str(tmp))
+        code, _, _ = self.check(tmp)
         self.assertEqual(code, 0)
 
     def test_check_fails_when_data_changes_and_write_fixes_it(self):
         tmp = self.make_repo()
         path = tmp / "results" / "stage3-llamacpp-gemma4-fit-target.json"
-        record = json.loads(path.read_text(encoding="utf-8"))
+        record = read_record(path)
         for m in record["metrics"]:
             if m["name"] == "generation_speed":
                 m["value"] = 80
         path.write_text(json.dumps(record, indent=2), encoding="utf-8")
-        code, _, err = self.run_main("--check", "--root", str(tmp))
+        code, _, err = self.check(tmp)
         self.assertEqual(code, 1)
         self.assertIn("README.md", err)
         self.assertIn("tokens-per-second.svg", err)
         self.assertEqual(self.run_main("--root", str(tmp))[0], 0)
-        self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 0)
+        self.assertEqual(self.check(tmp)[0], 0)
         self.assertIn("~80", (tmp / "README.md").read_text(encoding="utf-8"))
 
     def test_check_fails_when_the_readme_is_edited_by_hand(self):
@@ -208,7 +215,7 @@ class GeneratorBehaviour(unittest.TestCase):
         text = readme.read_text(encoding="utf-8")
         self.assertIn(STALE_PHRASE, text)
         readme.write_text(text.replace(STALE_PHRASE, EDITED_PHRASE), encoding="utf-8")
-        self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 1)
+        self.assertEqual(self.check(tmp)[0], 1)
 
     def test_text_outside_the_markers_is_preserved(self):
         tmp = self.make_repo()
@@ -228,36 +235,36 @@ class GeneratorBehaviour(unittest.TestCase):
         self.assertEqual(self.run_main("--root", str(tmp))[0], 0)
         self.assertIn(b"\r\n", readme.read_bytes())
         self.assertNotIn(b"\n", readme.read_bytes().replace(b"\r\n", b""))
-        self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 0)
+        self.assertEqual(self.check(tmp)[0], 0)
 
     def test_missing_markers_is_an_error(self):
         tmp = self.make_repo()
         readme = tmp / "README.md"
         readme.write_text(readme.read_text(encoding="utf-8").replace("<!-- results:end -->", ""),
                           encoding="utf-8")
-        code, _, err = self.run_main("--check", "--root", str(tmp))
+        code, _, err = self.check(tmp)
         self.assertEqual(code, 2)
         self.assertIn("results:begin", err)
 
     def test_invalid_record_is_an_error_naming_the_file(self):
         tmp = self.make_repo()
         path = tmp / "results" / "stage1-ollama-qwen3-8b.json"
-        record = json.loads(path.read_text(encoding="utf-8"))
+        record = read_record(path)
         del record["runs"]
         path.write_text(json.dumps(record), encoding="utf-8")
-        code, _, err = self.run_main("--check", "--root", str(tmp))
+        code, _, err = self.check(tmp)
         self.assertEqual(code, 2)
         self.assertIn("stage1-ollama-qwen3-8b.json", err)
 
     def test_records_without_a_stage_are_valid_but_not_rendered(self):
         tmp = self.make_repo()
-        extra = json.loads((tmp / "results" / "stage1-ollama-qwen3-8b.json").read_text(encoding="utf-8"))
+        extra = read_record(tmp / "results" / "stage1-ollama-qwen3-8b.json")
         extra["id"] = "bench-example"
         extra["stage"] = None
         extra["order"] = None
         extra["chart"] = None
         (tmp / "results" / "bench-example.json").write_text(json.dumps(extra), encoding="utf-8")
-        self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 0)
+        self.assertEqual(self.check(tmp)[0], 0)
 
 
 if __name__ == "__main__":

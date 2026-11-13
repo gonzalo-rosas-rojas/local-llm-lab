@@ -33,11 +33,11 @@ if (-not $PSBoundParameters.ContainsKey('Model')) { $Model = $CustomModelTag }
 # The variables set for this launch only. 'ollama' is a placeholder, not a secret: Ollama
 # does not check the token, but Claude Code wants a non-empty value here.
 $launchEnv = [ordered]@{
-    ANTHROPIC_BASE_URL = 'http://localhost:11434'
+    ANTHROPIC_BASE_URL = (Get-OllamaBaseUrl)
     ANTHROPIC_AUTH_TOKEN = 'ollama'
     ANTHROPIC_API_KEY = ''
     ANTHROPIC_MODEL = $Model
-    ANTHROPIC_SMALL_FAST_MODEL = 'qwen3:8b'
+    ANTHROPIC_SMALL_FAST_MODEL = (Get-StarterModelTag)
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
 }
 # A script run from a prompt shares the caller's process, so $env: changes would
@@ -54,8 +54,8 @@ try {
     Sync-SessionPath
 
     # Ollama must be running
-    try { Invoke-WebRequest 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 3 | Out-Null }
-    catch { Write-Host "Ollama is not answering. Run first: .\scripts\start-lab.ps1" -ForegroundColor Red; exit 1 }
+    try { Invoke-WebRequest "$(Get-OllamaBaseUrl)/api/version" -UseBasicParsing -TimeoutSec 3 | Out-Null }
+    catch { Write-Host "Ollama is not answering ($($_.Exception.Message)). Run first: .\scripts\start-lab.ps1" -ForegroundColor Red; exit 1 }
 
     # Claude Code needs a lot of context. If you asked for gpt-oss-cc and it does not
     # exist, create a gpt-oss variant with a large num_ctx (Ollama's default is small).
@@ -63,11 +63,11 @@ try {
         $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
         if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode)).$(Get-StderrTail -Result $list)" }
         if (-not (Test-ModelListed -ListLines $list.Output -Tag $CustomModelTag)) {
-            Write-Host "Creating $CustomModelName (num_ctx $ClaudeContextTokens) from gpt-oss:20b..." -ForegroundColor Cyan
+            Write-Host "Creating $CustomModelName (num_ctx $ClaudeContextTokens) from $(Get-MainModelTag)..." -ForegroundColor Cyan
             $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
-            "FROM gpt-oss:20b`nPARAMETER num_ctx $ClaudeContextTokens" | Set-Content -Path $mf -Encoding ascii
+            "FROM $(Get-MainModelTag)`nPARAMETER num_ctx $ClaudeContextTokens" | Set-Content -Path $mf -Encoding ascii
             $create = Invoke-External -Exe 'ollama' -Arguments @('create', $CustomModelName, '-f', $mf) -Capture
-            if ($create.ExitCode -ne 0) { throw "'ollama create $CustomModelName' failed (exit code $($create.ExitCode)). Is gpt-oss:20b downloaded? Run .\scripts\02-pull-models.ps1$(Get-StderrTail -Result $create)" }
+            if ($create.ExitCode -ne 0) { throw "'ollama create $CustomModelName' failed (exit code $($create.ExitCode)). Is $(Get-MainModelTag) downloaded? Run .\scripts\02-pull-models.ps1$(Get-StderrTail -Result $create)" }
         }
     }
     if (-not (Get-Command claude -ErrorAction Ignore)) { throw "The 'claude' command was not found. Install Claude Code first." }
