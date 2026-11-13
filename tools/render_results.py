@@ -16,6 +16,7 @@ import math
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -396,24 +397,40 @@ LEGEND_CHAR_PX = 8
 LEGEND_GAP_PX = 28
 
 
-def _tick_lines(ticks, x_of, top, axis_y):
+class Plot(NamedTuple):
+    """The chart's geometry in SVG pixels: where the plot area sits and how tall its rows are."""
+    left: int
+    plot_w: int
+    top: int
+    row_h: int
+    bar_h: int
+    axis_y: int
+    vmax: int
+
+    def x_of(self, value):
+        return self.left + self.plot_w * value / self.vmax
+
+
+def _tick_lines(plot, ticks):
+    top, axis_y = plot.top, plot.axis_y
     out = []
     for t in ticks:
-        x = x_of(t)
+        x = plot.x_of(t)
         out.append(f'  <line class="grid" x1="{x:.1f}" y1="{top - 8}" x2="{x:.1f}" y2="{axis_y}"/>')
         out.append(f'  <text class="muted" x="{x:.1f}" y="{axis_y + 18}" font-size="12" '
                    f'text-anchor="middle">{t}</text>')
     return out
 
 
-def _bar_lines(rows, series, x_of, left, top, row_h, bar_h):
+def _bar_lines(plot, rows, series):
+    left, top, row_h, bar_h = plot.left, plot.top, plot.row_h, plot.bar_h
     out = []
     for i, r in enumerate(rows):
         c = r["chart"]
         m = metric(r, "generation_speed")
         y = top + row_h * i
         cy = y + row_h / 2
-        w = x_of(m["value"]) - left
+        w = plot.x_of(m["value"]) - left
         cls = f"s{series.index(c['series'])}"
         out.append(f'  <text class="ink" x="{left - 12}" y="{cy - 3:.1f}" font-size="14" '
                    f'font-weight="600" text-anchor="end">{escape(c["label"])}</text>')
@@ -426,9 +443,10 @@ def _bar_lines(rows, series, x_of, left, top, row_h, bar_h):
     return out
 
 
-def _legend_lines(series, left, ly):
+def _legend_lines(plot, series):
+    ly = plot.axis_y + 64
     out = []
-    lx = left
+    lx = plot.left
     for i, name in enumerate(series):
         out.append(f'  <rect class="s{i}" x="{lx}" y="{ly - 10}" width="12" height="12" rx="2"/>')
         out.append(f'  <text class="ink" x="{lx + 18}" y="{ly}" font-size="12.5">{escape(name)}</text>')
@@ -458,8 +476,7 @@ def render_svg(records):
     vmax = nice_max(max(values))
     ticks = list(range(0, vmax + 1, TICK_STEP))
 
-    def x_of(v):
-        return left + plot_w * v / vmax
+    plot = Plot(left, plot_w, top, row_h, bar_h, axis_y, vmax)
 
     first_hw = rows[0]["hardware"]
     runs_unrecorded = any(r["runs"] is None for r in rows)
@@ -480,13 +497,13 @@ def render_svg(records):
         f'  <text class="ink" x="24" y="36" font-size="18" font-weight="600">{escape(title)}</text>',
         f'  <text class="muted" x="24" y="58" font-size="12.5">{escape(subtitle)}</text>',
     ]
-    out += _tick_lines(ticks, x_of, top, axis_y)
+    out += _tick_lines(plot, ticks)
     out.append(f'  <line class="axis" x1="{left}" y1="{top - 8}" x2="{left}" y2="{axis_y}"/>')
     out.append(f'  <line class="axis" x1="{left}" y1="{axis_y}" x2="{left + plot_w}" y2="{axis_y}"/>')
-    out += _bar_lines(rows, series, x_of, left, top, row_h, bar_h)
+    out += _bar_lines(plot, rows, series)
     out.append(f'  <text class="muted" x="{left + plot_w / 2:.1f}" y="{axis_y + 40}" '
                f'font-size="12.5" text-anchor="middle">tokens per second</text>')
-    out += _legend_lines(series, left, axis_y + 64)
+    out += _legend_lines(plot, series)
     out.append("</svg>")
     return "\n".join(out) + "\n"
 
