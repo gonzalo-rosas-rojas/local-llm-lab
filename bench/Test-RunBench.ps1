@@ -82,6 +82,13 @@ Confirm-Equal $bare.system.gpu_driver $null 'unknown driver is null'
 Confirm-Equal $bare.model.size_gb $null 'unknown size is null'
 Confirm-Equal $bare.parameters.gpu_layers $null 'absent -ngl is null'
 
+# Optional fields of llama-bench rows
+$row = '{"build_number": 4321, "backends": "CUDA"}' | ConvertFrom-Json
+Confirm-Equal (Get-OptionalField -Object $row -Name 'build_number') '4321' 'a present field comes back as text'
+Confirm-Equal (Get-OptionalField -Object $row -Name 'backends') 'CUDA' 'a present text field'
+Confirm-Equal (Get-OptionalField -Object $row -Name 'build_commit') $null 'an absent field is null'
+Confirm-Equal (Get-RecordId -TimestampUtc '2000-01-02T03:04:05Z' -ModelFile 'A_b.c-D.gguf') 'bench-20000102t030405z-a-b-c-d' 'record id slug'
+
 if ($EmitSample) {
     (($record | ConvertTo-Json -Depth 8) + "`n") | Set-Content -LiteralPath $EmitSample -Encoding UTF8
 }
