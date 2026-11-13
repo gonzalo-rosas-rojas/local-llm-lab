@@ -91,7 +91,10 @@ $failing = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'exit 3')
 Confirm-Equal $failing.ExitCode 3 'exit code is returned'
 $noisy = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'echo to-stdout & echo to-stderr 1>&2 & exit 2') -Capture
 Confirm-Equal $noisy.ExitCode 2 'stderr output under Stop does not throw, exit code kept'
-Confirm-Equal @($noisy.Output | ForEach-Object { $_.ToString().Trim() }) @('to-stdout') 'only stdout is captured'
+Confirm-Equal @($noisy.Output | ForEach-Object { $_.ToString().Trim() }) @('to-stdout') 'stdout is captured apart from stderr'
+Confirm-Equal @($noisy.Error) @('to-stderr') 'stderr is captured too'
+Confirm-Equal (Get-StderrTail -Result $noisy) ' Last stderr lines: to-stderr' 'the stderr tail for an error message'
+Confirm-Equal (Get-StderrTail -Result $failing) '' 'no stderr, no tail'
 
 if ($script:failures -gt 0) {
     Write-Host "$($script:failures) check(s) failed." -ForegroundColor Red

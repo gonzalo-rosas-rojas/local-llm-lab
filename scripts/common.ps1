@@ -23,9 +23,10 @@ function Sync-SessionPath {
 
 function Invoke-External {
     <#
-      Runs a program and returns an object with ExitCode and Output (stdout lines).
-      -Capture keeps stdout (stderr is discarded); without it the program's output goes
-      straight to the console. A program that is not installed gives $ExitCommandNotFound as ExitCode.
+      Runs a program and returns an object with ExitCode, Output (stdout lines) and Error
+      (stderr lines). -Capture keeps both; without it the program's output goes straight
+      to the console and Error is empty. A program that is not installed gives
+      $ExitCommandNotFound as ExitCode.
     #>
     param(
         [Parameter(Mandatory)][string]$Exe,
@@ -33,13 +34,16 @@ function Invoke-External {
         [switch]$Capture
     )
     if (-not (Get-Command $Exe -ErrorAction Ignore)) {
-        return [pscustomobject]@{ ExitCode = $ExitCommandNotFound; Output = @() }
+        return [pscustomobject]@{ ExitCode = $ExitCommandNotFound; Output = @(); Error = @() }
     }
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
+        $errorLines = @()
         if ($Capture) {
-            $lines = @(& $Exe @Arguments 2>$null)
+            $all = @(& $Exe @Arguments 2>&1)
+            $lines = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] })
+            $errorLines = @($all | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().Trim() })
         } else {
             & $Exe @Arguments | Out-Host
             $lines = @()
@@ -48,7 +52,15 @@ function Invoke-External {
     } finally {
         $ErrorActionPreference = $previous
     }
-    return [pscustomobject]@{ ExitCode = $code; Output = $lines }
+    return [pscustomobject]@{ ExitCode = $code; Output = $lines; Error = $errorLines }
+}
+
+function Get-StderrTail {
+    # " Last stderr lines: a | b" for the end of an error message, or '' when the program said nothing.
+    param([Parameter(Mandatory)][object]$Result, [int]$Count = 5)
+    $tail = @($Result.Error | Where-Object { $_ } | Select-Object -Last $Count)
+    if ($tail.Count -eq 0) { return '' }
+    return " Last stderr lines: $($tail -join ' | ')"
 }
 
 function Get-OllamaRoot {
