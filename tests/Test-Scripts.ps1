@@ -74,6 +74,9 @@ try {
 $labScripts = @(Get-ChildItem -Path (Join-Path $PSScriptRoot '..\scripts') -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'check-loopback.ps1' } | ForEach-Object { $_.FullName })
 Confirm-Equal (Get-LabPort -ScriptPath $labScripts) @(3000, 8080, 11434) 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
 
+# The container name the three Open WebUI scripts share.
+Confirm-Equal (Get-OpenWebUiContainerName) 'open-webui' 'Open WebUI container name'
+
 # Listener query: "nothing listens" is an answer, any other failure is not.
 $notFound = { param($p) Write-Error -Message 'no match' -Category ObjectNotFound -ErrorAction Stop }
 $listening = { param($p) @([pscustomobject]@{ LocalPort = $p; LocalAddress = '0.0.0.0' }) }

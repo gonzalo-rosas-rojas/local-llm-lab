@@ -63,6 +63,12 @@ function Get-StderrTail {
     return " Last stderr lines: $($tail -join ' | ')"
 }
 
+function Get-OpenWebUiContainerName {
+    # The Docker container (and volume) name Open WebUI runs under, shared by the scripts that
+    # create, start and stop it.
+    return 'open-webui'
+}
+
 function Get-OllamaRoot {
     # Folder where winget installs Ollama; start-lab.ps1 launches from it and stop-lab.ps1
     # only stops processes that run from it.

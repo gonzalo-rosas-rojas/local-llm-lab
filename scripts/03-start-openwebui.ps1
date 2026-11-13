@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-$ContainerName = 'open-webui'
+$ContainerName = Get-OpenWebUiContainerName
 
 try {
     # 1) Docker must be available and running
