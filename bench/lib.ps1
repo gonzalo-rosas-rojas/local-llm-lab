@@ -7,8 +7,8 @@
   process on its own except Invoke-Native.
 
   What is tested and what is not:
-    - Get-Median, Join-NativeArgument, Get-BenchArgumentList, Get-FlagValue and
-      Get-ResultRecord are tested with values written in the test itself.
+    - Get-Median, Join-NativeArgument, Get-BenchArgumentList, Get-FlagValue,
+      Get-OptionalField, Get-RecordId and Get-ResultRecord are tested with values written in the test itself.
     - ConvertFrom-BenchOutput is NOT tested. It reads llama-bench's JSON output
       (-o json) using the fields n_prompt, n_gen, avg_ts, build_number,
       build_commit and backends, as documented by llama.cpp, but this repository
