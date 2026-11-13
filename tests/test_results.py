@@ -154,7 +154,9 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         self.assertIn("run counts are not recorded", rr.render_svg(records))
         for r in records:
             r["runs"] = 3
-        self.assertNotIn("run counts are not recorded", rr.render_svg(records))
+        svg = rr.render_svg(records)
+        self.assertNotIn("run counts are not recorded", svg)
+        self.assertIn("Approximate figures (see results/).", svg)
 
     def test_chart_axis_covers_the_largest_bar(self):
         self.assertGreaterEqual(rr.nice_max(113), 113)

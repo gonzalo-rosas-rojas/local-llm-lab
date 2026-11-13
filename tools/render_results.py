@@ -413,9 +413,9 @@ def render_svg(records):
 
     first_hw = rows[0]["hardware"]
     runs_unrecorded = any(r["runs"] is None for r in rows)
-    subtitle = (f"{first_hw['gpu']}, {num(first_hw['vram_gb'])} GB VRAM. Approximate figures; "
-                + ("run counts are not recorded " if runs_unrecorded else "")
-                + "(see results/).")
+    caveats = ["run counts are not recorded"] if runs_unrecorded else []
+    subtitle = (f"{first_hw['gpu']}, {num(first_hw['vram_gb'])} GB VRAM. "
+                + "; ".join(["Approximate figures", *caveats]) + " (see results/).")
     title = "Generation speed in tokens per second (higher is better)"
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
