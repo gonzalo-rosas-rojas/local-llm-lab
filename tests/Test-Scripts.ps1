@@ -82,7 +82,7 @@ Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $notFound).Count 0 'no matc
 Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $listening)[0].LocalAddress '0.0.0.0' 'listeners are returned'
 $failure = $null
 try { [void](Get-ListenerOnPort -Port 8080 -Query $broken) } catch { $failure = $_.Exception.Message }
-Confirm-Equal ($failure -like '*port 8080*access denied by the fake query*') $true 'a failed query stops the check and says why'
+Confirm-Equal ($failure -like '*port 8080*access denied by the fake query*') $true 'a failed query throws with the port and the reason'
 
 # External programs: exit codes come back, stderr does not throw, a missing program is 127.
 $missing = Invoke-External -Exe 'definitely-not-installed-xyz'
