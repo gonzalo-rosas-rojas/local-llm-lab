@@ -41,6 +41,11 @@ function Stop-LabProcess {
         }
     }
     foreach ($o in $found.Other) {
+        # ShouldContinue ignores -WhatIf, so a dry run must not ask (or claim to have stopped anything).
+        if ($WhatIfPreference) {
+            Write-Host "    What if: would ask whether to stop $($o.Process.Name) (pid $($o.Process.Id))." -ForegroundColor Yellow
+            continue
+        }
         $where = $o.Path
         if (-not $where) { $where = 'path unreadable' }
         Write-Host "    Not stopped: $($o.Process.Name) (pid $($o.Process.Id)) runs from outside the lab folders ($where)." -ForegroundColor Yellow
