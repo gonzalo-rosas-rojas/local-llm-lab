@@ -36,8 +36,8 @@ import time
 DEFAULT_MODEL = "qwen3:8b"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 PROMPT = "Explain in 3 sentences what quantization of an LLM is."
-# The first token marks the start of generation, so only the tokens after it are timed.
-UNTIMED_FIRST_TOKEN = 1
+# The first token or streamed chunk marks the start of generation, so it is not timed.
+UNTIMED_FIRST_UNIT = 1
 
 
 def make_client(base_url):
@@ -100,8 +100,8 @@ def speed_of(run):
     if run["gen_time"] <= 0:
         return None, None
     if run["tokens"] is not None:
-        return (run["tokens"] - UNTIMED_FIRST_TOKEN) / run["gen_time"], "tok/s"
-    return (run["chunks"] - UNTIMED_FIRST_TOKEN) / run["gen_time"], "chunks/s"
+        return (run["tokens"] - UNTIMED_FIRST_UNIT) / run["gen_time"], "tok/s"
+    return (run["chunks"] - UNTIMED_FIRST_UNIT) / run["gen_time"], "chunks/s"
 
 
 def _combine_speeds(speeds):
