@@ -48,11 +48,11 @@ Confirm-Equal (Get-FlagValue -Flags @('-ngl', '99') -Name '-fa') $null 'flag val
 Confirm-Equal (Get-FlagValue -Flags @('-fa') -Name '-fa') $null 'flag at the end has no value'
 
 # Command construction
-Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf') @('-m', 'm.gguf', '-p', '512', '-n', '128', '-r', '1', '-o', 'json') 'default arguments'
+Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128) @('-m', 'm.gguf', '-p', '512', '-n', '128', '-r', '1', '-o', 'json') 'arguments without flags'
 Confirm-Equal (Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-ngl', '99', '-fa', '1') -Prompt 256 -Generate 64) `
     @('-m', 'm.gguf', '-p', '256', '-n', '64', '-r', '1', '-o', 'json', '-ngl', '99', '-fa', '1') 'arguments with flags'
-Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
-Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128 -Flags @('-r', '5') } "set by run-bench" 'reserved flag -r is refused'
+Confirm-Failure { Get-BenchArgumentList -ModelPath 'm.gguf' -Prompt 512 -Generate 128 -Flags @('-o', 'csv') } "set by run-bench" 'reserved flag -o is refused'
 
 # Argument quoting
 Confirm-Equal (Join-NativeArgument -Arguments @('-m', 'a b.gguf', '-ngl', '99')) '-m "a b.gguf" -ngl 99' 'quotes an argument with a space'

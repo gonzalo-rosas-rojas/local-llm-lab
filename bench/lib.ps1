@@ -54,8 +54,8 @@ function Get-BenchArgumentList {
     param(
         [Parameter(Mandatory)][string]$ModelPath,
         [string[]]$Flags = @(),
-        [int]$Prompt = 512,
-        [int]$Generate = 128
+        [Parameter(Mandatory)][int]$Prompt,
+        [Parameter(Mandatory)][int]$Generate
     )
     Test-BenchFlag -Flags $Flags
     return @('-m', $ModelPath, '-p', "$Prompt", '-n', "$Generate", '-r', '1', '-o', 'json') + @($Flags)
@@ -66,6 +66,9 @@ function Join-NativeArgument {
     # 5.1 has no ArgumentList) hands to CreateProcess. Also used for the command
     # line written to the result record.
     param([string[]]$Arguments)
+    # CommandLineToArgvW rules: backslashes are literal unless they precede a quote, so double the
+    # ones before an embedded quote (and escape that quote) and the ones at the end of the argument
+    # (they would otherwise escape the closing quote).
     $parts = foreach ($a in @($Arguments)) {
         if ($a -eq '' -or $a -match '[\s"]') {
             '"' + ($a -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
