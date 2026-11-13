@@ -36,6 +36,8 @@ import time
 DEFAULT_MODEL = "qwen3:8b"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 PROMPT = "Explain in 3 sentences what quantization of an LLM is."
+# The first token marks the start of generation, so only the tokens after it are timed.
+UNTIMED_FIRST_TOKEN = 1
 
 
 def make_client(base_url):
@@ -98,8 +100,16 @@ def speed_of(run):
     if run["gen_time"] <= 0:
         return None, None
     if run["tokens"] is not None:
-        return (run["tokens"] - 1) / run["gen_time"], "tok/s"
-    return (run["chunks"] - 1) / run["gen_time"], "chunks/s"
+        return (run["tokens"] - UNTIMED_FIRST_TOKEN) / run["gen_time"], "tok/s"
+    return (run["chunks"] - UNTIMED_FIRST_TOKEN) / run["gen_time"], "chunks/s"
+
+
+def _combine_speeds(speeds):
+    """(unit, values) when every run has a speed in the same unit, else (None, [])."""
+    units = {u for _, u in speeds}
+    if None in {v for v, _ in speeds} or len(units) != 1:
+        return None, []
+    return units.pop(), [v for v, _ in speeds]
 
 
 def measure(client, model, prompt, runs=3, warmup=1, clock=time.perf_counter, on_text=None):
@@ -108,13 +118,7 @@ def measure(client, model, prompt, runs=3, warmup=1, clock=time.perf_counter, on
         run_once(client, model, prompt, clock=clock)
     results = [run_once(client, model, prompt, clock=clock, on_text=on_text) for _ in range(runs)]
     speeds = [speed_of(r) for r in results]
-    units = {u for _, u in speeds}
-    if None in {v for v, _ in speeds} or len(units) != 1:
-        unit = None
-        values = []
-    else:
-        unit = units.pop()
-        values = [v for v, _ in speeds]
+    unit, values = _combine_speeds(speeds)
     ttfts = [r["ttft"] for r in results]
     return {
         "runs": runs,
@@ -143,7 +147,7 @@ def describe_error(exc, base_url, model):
     return f"request to {base_url} failed: {name}: {exc}"
 
 
-def build_record(model, base_url, summary, command, when=None):
+def build_record(model, summary, command, when=None):
     """A results/ record (see results/schema.json) for one smoke-test session."""
     when = when or datetime.datetime.now(datetime.timezone.utc)
     stamp = when.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -192,30 +196,50 @@ def build_record(model, base_url, summary, command, when=None):
     }
 
 
-def _positive(text):
-    value = int(text)
-    if value < 1:
-        raise argparse.ArgumentTypeError("must be 1 or more")
-    return value
-
-
-def _non_negative(text):
-    value = int(text)
-    if value < 0:
-        raise argparse.ArgumentTypeError("must be 0 or more")
-    return value
+def _int_at_least(minimum):
+    """An argparse type that accepts integers of `minimum` or more."""
+    def parse(text):
+        value = int(text)
+        if value < minimum:
+            raise argparse.ArgumentTypeError(f"must be {minimum} or more")
+        return value
+    return parse
 
 
 def parse_args(argv):
-    ap = argparse.ArgumentParser(description="Time-to-first-token and generation speed over an OpenAI-compatible API.")
-    ap.add_argument("model", nargs="?", default=DEFAULT_MODEL, help=f"model name (default {DEFAULT_MODEL})")
-    ap.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"API base URL (default {DEFAULT_BASE_URL})")
-    ap.add_argument("--runs", type=_positive, default=3, help="measured runs (default 3)")
-    ap.add_argument("--warmup", type=_non_negative, default=1, help="discarded warm-up runs (default 1)")
-    ap.add_argument("--prompt", default=PROMPT, help="prompt to send")
-    ap.add_argument("--json", metavar="PATH", help="also write a results/ record to PATH (never overwrites)")
-    ap.add_argument("--show-text", action="store_true", help="print the streamed answer of each measured run")
-    return ap.parse_args(argv)
+    parser = argparse.ArgumentParser(description="Time-to-first-token and generation speed over an OpenAI-compatible API.")
+    parser.add_argument("model", nargs="?", default=DEFAULT_MODEL, help=f"model name (default {DEFAULT_MODEL})")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"API base URL (default {DEFAULT_BASE_URL})")
+    parser.add_argument("--runs", type=_int_at_least(1), default=3, help="measured runs (default 3)")
+    parser.add_argument("--warmup", type=_int_at_least(0), default=1, help="discarded warm-up runs (default 1)")
+    parser.add_argument("--prompt", default=PROMPT, help="prompt to send")
+    parser.add_argument("--json", metavar="PATH", help="also write a results/ record to PATH (never overwrites)")
+    parser.add_argument("--show-text", action="store_true", help="print the streamed answer of each measured run")
+    return parser.parse_args(argv)
+
+
+def print_summary(summary, runs):
+    """Print the two headline numbers of a measured session."""
+    print(f"TTFT, median of {runs}: {summary['ttft_median']:.2f} s")
+    if summary["speed_unit"] is None:
+        print("Generation speed: not available (runs too short to time)")
+    else:
+        print(f"Generation speed, median of {runs}: {summary['speed_median']:.1f} {summary['speed_unit']}")
+        if summary["speed_unit"] == "chunks/s":
+            print("(the server sent no token count, so this counts streamed chunks, not tokens)")
+
+
+def write_record(path, record):
+    """Write the record to a new file; False (after saying why on stderr) when it cannot."""
+    try:
+        with open(path, "x", encoding="utf-8") as fh:
+            json.dump(record, fh, indent=2)
+            fh.write("\n")
+    except OSError as exc:  # includes FileExistsError if the file appeared meanwhile
+        print(f"smoke_test: cannot write {path}: {exc}", file=sys.stderr)
+        return False
+    print(f"Wrote {path}")
+    return True
 
 
 def main(argv=None, client_factory=make_client, clock=time.perf_counter):
@@ -238,23 +262,11 @@ def main(argv=None, client_factory=make_client, clock=time.perf_counter):
         return 1
     if args.show_text:
         print()
-    print(f"TTFT, median of {args.runs}: {summary['ttft_median']:.2f} s")
-    if summary["speed_unit"] is None:
-        print("Generation speed: not available (runs too short to time)")
-    else:
-        print(f"Generation speed, median of {args.runs}: {summary['speed_median']:.1f} {summary['speed_unit']}")
-        if summary["speed_unit"] == "chunks/s":
-            print("(the server sent no token count, so this counts streamed chunks, not tokens)")
+    print_summary(summary, args.runs)
     if args.json:
-        record = build_record(args.model, args.base_url, summary, "python clients/smoke_test.py " + " ".join(argv))
-        try:
-            with open(args.json, "x", encoding="utf-8") as fh:
-                json.dump(record, fh, indent=2)
-                fh.write("\n")
-        except OSError as exc:  # includes FileExistsError if the file appeared meanwhile
-            print(f"smoke_test: cannot write {args.json}: {exc}", file=sys.stderr)
+        record = build_record(args.model, summary, "python clients/smoke_test.py " + " ".join(argv))
+        if not write_record(args.json, record):
             return 1
-        print(f"Wrote {args.json}")
     return 0
 
 
