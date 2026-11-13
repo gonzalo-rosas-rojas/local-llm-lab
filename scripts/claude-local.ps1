@@ -28,7 +28,7 @@ $ErrorActionPreference = 'Stop'
 # The default model: a gpt-oss variant created below with a large context.
 $CustomModelName = 'gpt-oss-cc'
 $CustomModelTag = "${CustomModelName}:latest"
-if (-not $Model) { $Model = $CustomModelTag }
+if (-not $PSBoundParameters.ContainsKey('Model')) { $Model = $CustomModelTag }
 
 # The variables set for this launch only. 'ollama' is a placeholder, not a secret: Ollama
 # does not check the token, but Claude Code wants a non-empty value here.
