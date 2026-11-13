@@ -109,7 +109,6 @@ class Measure(unittest.TestCase):
         self.assertEqual(summary["speed_samples"], [10.0, 40.0, 20.0])
         self.assertEqual(summary["speed_median"], 20.0)
         self.assertEqual(summary["speed_unit"], "tok/s")
-        self.assertEqual(summary["tokens_samples"], [11, 41, 21])
 
     def test_no_warmup_when_zero(self):
         client = FakeClient([[text_chunk("a"), usage_chunk(5)]])

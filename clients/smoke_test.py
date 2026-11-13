@@ -38,6 +38,9 @@ DEFAULT_BASE_URL = "http://localhost:11434/v1"
 PROMPT = "Explain in 3 sentences what quantization of an LLM is."
 # The first token or streamed chunk marks the start of generation, so it is not timed.
 UNTIMED_FIRST_UNIT = 1
+# The two units of generation speed; results/schema.json lists both.
+UNIT_TOKENS = "tok/s"
+UNIT_CHUNKS = "chunks/s"
 
 
 def make_client(base_url):
@@ -100,8 +103,8 @@ def speed_of(run):
     if run["gen_time"] <= 0:
         return None, None
     if run["tokens"] is not None:
-        return (run["tokens"] - UNTIMED_FIRST_UNIT) / run["gen_time"], "tok/s"
-    return (run["chunks"] - UNTIMED_FIRST_UNIT) / run["gen_time"], "chunks/s"
+        return (run["tokens"] - UNTIMED_FIRST_UNIT) / run["gen_time"], UNIT_TOKENS
+    return (run["chunks"] - UNTIMED_FIRST_UNIT) / run["gen_time"], UNIT_CHUNKS
 
 
 def _combine_speeds(speeds):
@@ -128,7 +131,6 @@ def measure(client, model, prompt, runs=3, warmup=1, clock=time.perf_counter, on
         "speed_unit": unit,
         "speed_samples": values,
         "speed_median": statistics.median(values) if values else None,
-        "tokens_samples": [r["tokens"] for r in results],
     }
 
 
@@ -165,14 +167,14 @@ def build_record(model, summary, command, when=None):
         "The client cannot see the server's engine, build, flags, GPU or driver; those fields are null.",
     ]
     if summary["speed_unit"] is not None:
-        label = ("generation, server token count" if summary["speed_unit"] == "tok/s"
+        label = ("generation, server token count" if summary["speed_unit"] == UNIT_TOKENS
                  else "generation, streamed chunks")
         metrics.append({
             "name": "generation_speed", "label": label, "unit": summary["speed_unit"],
             "value": summary["speed_median"], "approximate": False,
             "statistic": statistic, "samples": summary["speed_samples"],
         })
-        if summary["speed_unit"] == "chunks/s":
+        if summary["speed_unit"] == UNIT_CHUNKS:
             notes.append("The server sent no token count, so speed is streamed chunks per second, not tokens.")
     else:
         notes.append("No generation speed: the runs were too short to time or mixed token counts and chunk counts.")
@@ -225,7 +227,7 @@ def print_summary(summary, runs):
         print("Generation speed: not available (runs too short to time)")
     else:
         print(f"Generation speed, median of {runs}: {summary['speed_median']:.1f} {summary['speed_unit']}")
-        if summary["speed_unit"] == "chunks/s":
+        if summary["speed_unit"] == UNIT_CHUNKS:
             print("(the server sent no token count, so this counts streamed chunks, not tokens)")
 
 
