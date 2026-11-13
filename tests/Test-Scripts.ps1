@@ -44,6 +44,10 @@ Confirm-Equal (Test-PathUnder -Path 'c:\lab\TOOLS\llamacpp\x.exe' -Root 'C:\Lab\
 Confirm-Equal (Test-PathUnder -Path 'C:\Lab\tools\llamacpp\..\..\evil.exe' -Root 'C:\Lab\tools\llamacpp') $false 'parent segments are resolved'
 Confirm-Equal (Test-PathUnder -Path $null -Root 'C:\Lab') $false 'an unreadable path is outside'
 
+# The Ollama folder start-lab.ps1 launches from and stop-lab.ps1 protects is one value.
+Confirm-Equal ((Get-OllamaRoot) -like '*\Programs\Ollama') $true 'Ollama root is under Programs\Ollama'
+Confirm-Equal (Test-PathUnder -Path (Join-Path (Get-OllamaRoot) 'ollama.exe') -Root (Get-OllamaRoot)) $true 'ollama.exe is inside the Ollama root'
+
 # Loopback: only 127.0.0.0/8 and ::1 are local; "every interface" addresses are not.
 Confirm-Equal (Test-LoopbackAddress -Address '127.0.0.1') $true '127.0.0.1 is loopback'
 Confirm-Equal (Test-LoopbackAddress -Address '127.5.4.3') $true 'all of 127/8 is loopback'

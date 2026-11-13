@@ -51,6 +51,12 @@ function Invoke-External {
     return [pscustomobject]@{ ExitCode = $code; Output = $lines }
 }
 
+function Get-OllamaRoot {
+    # Folder where winget installs Ollama; start-lab.ps1 launches from it and stop-lab.ps1
+    # only stops processes that run from it.
+    return Join-Path $env:LOCALAPPDATA 'Programs\Ollama'
+}
+
 function Test-ModelListed {
     <#
       True when the model Tag is in the output of `ollama list`. The comparison is on the
