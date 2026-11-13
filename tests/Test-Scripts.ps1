@@ -11,11 +11,11 @@ $ErrorActionPreference = 'Stop'
 $script:failures = 0
 function Confirm-Equal {
     param($Actual, $Expected, [string]$Name)
-    $a = ConvertTo-Json -InputObject $Actual -Compress -Depth 4
-    $e = ConvertTo-Json -InputObject $Expected -Compress -Depth 4
-    if ($a -ne $e) {
+    $actualJson = ConvertTo-Json -InputObject $Actual -Compress -Depth 4
+    $expectedJson = ConvertTo-Json -InputObject $Expected -Compress -Depth 4
+    if ($actualJson -ne $expectedJson) {
         $script:failures++
-        Write-Host "FAIL $Name`n  expected: $e`n  actual:   $a" -ForegroundColor Red
+        Write-Host "FAIL $Name`n  expected: $expectedJson`n  actual:   $actualJson" -ForegroundColor Red
     } else {
         Write-Host "ok   $Name" -ForegroundColor Green
     }
@@ -70,8 +70,22 @@ try {
 } finally {
     Remove-Item -LiteralPath $tmp -ErrorAction Ignore
 }
-$real = @(Get-ChildItem -Path (Join-Path $PSScriptRoot '..\scripts') -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'check-loopback.ps1' } | ForEach-Object { $_.FullName })
-Confirm-Equal (Get-LabPort -ScriptPath $real) @(3000, 8080, 11434) 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
+# check-loopback.ps1 is left out, as it does itself: it is the checker, not something the lab starts.
+$labScripts = @(Get-ChildItem -Path (Join-Path $PSScriptRoot '..\scripts') -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'check-loopback.ps1' } | ForEach-Object { $_.FullName })
+Confirm-Equal (Get-LabPort -ScriptPath $labScripts) @(3000, 8080, 11434) 'the lab scripts name exactly Ollama, Open WebUI and llama-server ports'
+
+# The container name the three Open WebUI scripts share.
+Confirm-Equal (Get-OpenWebUiContainerName) 'open-webui' 'Open WebUI container name'
+
+# Listener query: "nothing listens" is an answer, any other failure is not.
+$notFound = { param($p) Write-Error -Message 'no match' -Category ObjectNotFound -ErrorAction Stop }
+$listening = { param($p) @([pscustomobject]@{ LocalPort = $p; LocalAddress = '0.0.0.0' }) }
+$broken = { param($p) throw 'access denied by the fake query' }
+Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $notFound).Count 0 'no match means no listener'
+Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $listening)[0].LocalAddress '0.0.0.0' 'listeners are returned'
+$failure = $null
+try { [void](Get-ListenerOnPort -Port 8080 -Query $broken) } catch { $failure = $_.Exception.Message }
+Confirm-Equal ($failure -like '*port 8080*access denied by the fake query*') $true 'a failed query throws with the port and the reason'
 
 # External programs: exit codes come back, stderr does not throw, a missing program is 127.
 $missing = Invoke-External -Exe 'definitely-not-installed-xyz'
@@ -80,7 +94,10 @@ $failing = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'exit 3')
 Confirm-Equal $failing.ExitCode 3 'exit code is returned'
 $noisy = Invoke-External -Exe 'cmd.exe' -Arguments @('/c', 'echo to-stdout & echo to-stderr 1>&2 & exit 2') -Capture
 Confirm-Equal $noisy.ExitCode 2 'stderr output under Stop does not throw, exit code kept'
-Confirm-Equal @($noisy.Output | ForEach-Object { $_.ToString().Trim() }) @('to-stdout') 'only stdout is captured'
+Confirm-Equal @($noisy.Output | ForEach-Object { $_.ToString().Trim() }) @('to-stdout') 'stdout is captured apart from stderr'
+Confirm-Equal @($noisy.Error) @('to-stderr') 'stderr is captured too'
+Confirm-Equal (Get-StderrTail -Result $noisy) ' Last stderr lines: to-stderr' 'the stderr tail for an error message'
+Confirm-Equal (Get-StderrTail -Result $failing) '' 'no stderr, no tail'
 
 if ($script:failures -gt 0) {
     Write-Host "$($script:failures) check(s) failed." -ForegroundColor Red

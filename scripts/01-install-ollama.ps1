@@ -41,7 +41,7 @@ try {
         $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/version' -UseBasicParsing -TimeoutSec 5
         Write-Host "    Server OK: $($r.Content)" -ForegroundColor Green
     } catch {
-        Write-Host "    The server did not answer yet." -ForegroundColor Yellow
+        Write-Host "    The server did not answer yet: $($_.Exception.Message)" -ForegroundColor Yellow
         Write-Host "    Open the Ollama app (tray icon) or run 'ollama serve' and try again." -ForegroundColor Yellow
     }
 } catch {

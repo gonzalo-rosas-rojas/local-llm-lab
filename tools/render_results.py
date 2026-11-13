@@ -16,6 +16,7 @@ import math
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,12 +29,6 @@ ID_BENCH_QWEN = "stage2-llamacpp-qwen3-8b-bench"
 ID_VRAM_QWEN = "stage2-llamacpp-qwen3-8b-vram"
 ID_GEMMA_CPU = "stage3-llamacpp-gemma4-cpu-moe"
 ID_GEMMA_FIT = "stage3-llamacpp-gemma4-fit-target"
-
-STAGE_TITLES = {
-    1: "Stage 1: Ollama, models that fit in VRAM",
-    2: "Stage 2: llama.cpp directly, same model as Ollama",
-    3: "Stage 3: Mixture-of-experts offload, a model that does not fit",
-}
 
 
 # ---------------------------------------------------------------- validation
@@ -195,8 +190,8 @@ def stage2_section(records):
     eng = bench["engine"]
     pp = need(bench, "prompt_processing_speed")
     tg = need(bench, "generation_speed")
-    vm = need(vram, "vram")
-    vp = vram["parameters"]
+    vram_metric = need(vram, "vram")
+    vram_params = vram["parameters"]
     ollama_tg = need(ollama, "generation_speed")
     gain = round((tg["value"] / ollama_tg["value"] - 1) * 100)
     lines = [
@@ -208,8 +203,8 @@ def stage2_section(records):
         "|---|---|",
         f"| Prompt processing ({pp['label']}) | {with_unit(pp)} |",
         f"| Generation ({tg['label']}) | {with_unit(tg)} |",
-        f"| VRAM, model + KV cache at {vp['kv_cache_type']}, context {vp['context']} "
-        f"| {with_unit(vm)} |",
+        f"| VRAM, model + KV cache at {vram_params['kv_cache_type']}, context {vram_params['context']} "
+        f"| {with_unit(vram_metric)} |",
         "",
         f"Same model through Ollama generates at {with_unit(ollama_tg)}, so llama.cpp is "
         f"~{gain}% faster, in exchange for managing the flags yourself. "
@@ -272,11 +267,11 @@ def provenance_section(records):
         "|---|---|---|---|---|",
     ]
     for r in records:
-        mo = r["measured_on"]
-        if mo["date"] is None:
+        measured_on = r["measured_on"]
+        if measured_on["date"] is None:
             date = "not recorded"
         else:
-            date = f"{mo['date']} ({mo['date_kind']} date)"
+            date = f"{measured_on['date']} ({measured_on['date_kind']} date)"
         runs = "not recorded" if r["runs"] is None else str(r["runs"])
         logged = "no" if r["command"] is None else "yes"
         lines.append(
@@ -286,11 +281,20 @@ def provenance_section(records):
     return "\n".join(lines)
 
 
+# stage number -> (heading, function that renders its section)
+STAGE_SECTIONS = {
+    1: ("Stage 1: Ollama, models that fit in VRAM", stage1_section),
+    2: ("Stage 2: llama.cpp directly, same model as Ollama", stage2_section),
+    3: ("Stage 3: Mixture-of-experts offload, a model that does not fit", stage3_section),
+}
+
+
 def results_block(records):
     out = []
     for stage in sorted({r["stage"] for r in records}):
-        out += [f"### {STAGE_TITLES[stage]}", ""]
-        out += {1: stage1_section, 2: stage2_section, 3: stage3_section}[stage](records)
+        title, section = STAGE_SECTIONS[stage]
+        out += [f"### {title}", ""]
+        out += section(records)
         out.append("")
     out.append(
         "Each figure is one record in [`results/`](results/) with its provenance "
@@ -388,8 +392,72 @@ def nice_max(top):
     return math.ceil(top * AXIS_HEADROOM / TICK_STEP) * TICK_STEP
 
 
+# Legend swatches: the label width is an estimate (no font metrics here), plus a gap.
+LEGEND_CHAR_PX = 8
+LEGEND_GAP_PX = 28
+
+
+class Plot(NamedTuple):
+    """The chart's geometry in SVG pixels: where the plot area sits and how tall its rows are."""
+    left: int
+    plot_w: int
+    top: int
+    row_h: int
+    bar_h: int
+    axis_y: int
+    vmax: int
+
+    def x_of(self, value):
+        return self.left + self.plot_w * value / self.vmax
+
+
+def _tick_lines(plot, ticks):
+    top, axis_y = plot.top, plot.axis_y
+    out = []
+    for t in ticks:
+        x = plot.x_of(t)
+        out.append(f'  <line class="grid" x1="{x:.1f}" y1="{top - 8}" x2="{x:.1f}" y2="{axis_y}"/>')
+        out.append(f'  <text class="muted" x="{x:.1f}" y="{axis_y + 18}" font-size="12" '
+                   f'text-anchor="middle">{t}</text>')
+    return out
+
+
+def _bar_lines(plot, rows, series):
+    left, top, row_h, bar_h = plot.left, plot.top, plot.row_h, plot.bar_h
+    out = []
+    for i, r in enumerate(rows):
+        c = r["chart"]
+        m = metric(r, "generation_speed")
+        y = top + row_h * i
+        cy = y + row_h / 2
+        w = plot.x_of(m["value"]) - left
+        cls = f"s{series.index(c['series'])}"
+        out.append(f'  <text class="ink" x="{left - 12}" y="{cy - 3:.1f}" font-size="14" '
+                   f'font-weight="600" text-anchor="end">{escape(c["label"])}</text>')
+        out.append(f'  <text class="muted" x="{left - 12}" y="{cy + 13:.1f}" font-size="12" '
+                   f'text-anchor="end">{escape(c["sublabel"])}</text>')
+        out.append(f'  <rect class="{cls}" x="{left}" y="{cy - bar_h / 2:.1f}" width="{w:.1f}" '
+                   f'height="{bar_h}" rx="3"/>')
+        out.append(f'  <text class="ink" x="{left + w + 8:.1f}" y="{cy + 5:.1f}" font-size="14" '
+                   f'font-weight="600">{escape(shown(m))}</text>')
+    return out
+
+
+def _legend_lines(plot, series):
+    ly = plot.axis_y + 64
+    out = []
+    lx = plot.left
+    for i, name in enumerate(series):
+        out.append(f'  <rect class="s{i}" x="{lx}" y="{ly - 10}" width="12" height="12" rx="2"/>')
+        out.append(f'  <text class="ink" x="{lx + 18}" y="{ly}" font-size="12.5">{escape(name)}</text>')
+        lx += 18 + LEGEND_CHAR_PX * len(name) + LEGEND_GAP_PX
+    return out
+
+
 def render_svg(records):
     rows = chart_rows(records)
+    if not rows:
+        raise ValueError("no record in results/ has a chart entry and a generation_speed metric")
     series = []
     for r in rows:
         if r["chart"]["series"] not in series:
@@ -408,8 +476,7 @@ def render_svg(records):
     vmax = nice_max(max(values))
     ticks = list(range(0, vmax + 1, TICK_STEP))
 
-    def x_of(v):
-        return left + plot_w * v / vmax
+    plot = Plot(left, plot_w, top, row_h, bar_h, axis_y, vmax)
 
     first_hw = rows[0]["hardware"]
     runs_unrecorded = any(r["runs"] is None for r in rows)
@@ -430,36 +497,13 @@ def render_svg(records):
         f'  <text class="ink" x="24" y="36" font-size="18" font-weight="600">{escape(title)}</text>',
         f'  <text class="muted" x="24" y="58" font-size="12.5">{escape(subtitle)}</text>',
     ]
-    for t in ticks:
-        x = x_of(t)
-        out.append(f'  <line class="grid" x1="{x:.1f}" y1="{top - 8}" x2="{x:.1f}" y2="{axis_y}"/>')
-        out.append(f'  <text class="muted" x="{x:.1f}" y="{axis_y + 18}" font-size="12" '
-                   f'text-anchor="middle">{t}</text>')
+    out += _tick_lines(plot, ticks)
     out.append(f'  <line class="axis" x1="{left}" y1="{top - 8}" x2="{left}" y2="{axis_y}"/>')
     out.append(f'  <line class="axis" x1="{left}" y1="{axis_y}" x2="{left + plot_w}" y2="{axis_y}"/>')
-    for i, r in enumerate(rows):
-        c = r["chart"]
-        m = metric(r, "generation_speed")
-        y = top + row_h * i
-        cy = y + row_h / 2
-        w = x_of(m["value"]) - left
-        cls = f"s{series.index(c['series'])}"
-        out.append(f'  <text class="ink" x="{left - 12}" y="{cy - 3:.1f}" font-size="14" '
-                   f'font-weight="600" text-anchor="end">{escape(c["label"])}</text>')
-        out.append(f'  <text class="muted" x="{left - 12}" y="{cy + 13:.1f}" font-size="12" '
-                   f'text-anchor="end">{escape(c["sublabel"])}</text>')
-        out.append(f'  <rect class="{cls}" x="{left}" y="{cy - bar_h / 2:.1f}" width="{w:.1f}" '
-                   f'height="{bar_h}" rx="3"/>')
-        out.append(f'  <text class="ink" x="{left + w + 8:.1f}" y="{cy + 5:.1f}" font-size="14" '
-                   f'font-weight="600">{escape(shown(m))}</text>')
+    out += _bar_lines(plot, rows, series)
     out.append(f'  <text class="muted" x="{left + plot_w / 2:.1f}" y="{axis_y + 40}" '
                f'font-size="12.5" text-anchor="middle">tokens per second</text>')
-    lx = left
-    ly = axis_y + 64
-    for i, name in enumerate(series):
-        out.append(f'  <rect class="s{i}" x="{lx}" y="{ly - 10}" width="12" height="12" rx="2"/>')
-        out.append(f'  <text class="ink" x="{lx + 18}" y="{ly}" font-size="12.5">{escape(name)}</text>')
-        lx += 18 + 8 * len(name) + 28
+    out += _legend_lines(plot, series)
     out.append("</svg>")
     return "\n".join(out) + "\n"
 

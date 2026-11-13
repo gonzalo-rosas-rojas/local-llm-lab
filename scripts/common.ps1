@@ -23,9 +23,10 @@ function Sync-SessionPath {
 
 function Invoke-External {
     <#
-      Runs a program and returns an object with ExitCode and Output (stdout lines).
-      -Capture keeps stdout (stderr is discarded); without it the program's output goes
-      straight to the console. A program that is not installed gives $ExitCommandNotFound as ExitCode.
+      Runs a program and returns an object with ExitCode, Output (stdout lines) and Error
+      (stderr lines). -Capture keeps both; without it the program's output goes straight
+      to the console and Error is empty. A program that is not installed gives
+      $ExitCommandNotFound as ExitCode.
     #>
     param(
         [Parameter(Mandatory)][string]$Exe,
@@ -33,13 +34,16 @@ function Invoke-External {
         [switch]$Capture
     )
     if (-not (Get-Command $Exe -ErrorAction Ignore)) {
-        return [pscustomobject]@{ ExitCode = $ExitCommandNotFound; Output = @() }
+        return [pscustomobject]@{ ExitCode = $ExitCommandNotFound; Output = @(); Error = @() }
     }
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
+        $errorLines = @()
         if ($Capture) {
-            $lines = @(& $Exe @Arguments 2>$null)
+            $all = @(& $Exe @Arguments 2>&1)
+            $lines = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] })
+            $errorLines = @($all | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().Trim() })
         } else {
             & $Exe @Arguments | Out-Host
             $lines = @()
@@ -48,7 +52,21 @@ function Invoke-External {
     } finally {
         $ErrorActionPreference = $previous
     }
-    return [pscustomobject]@{ ExitCode = $code; Output = $lines }
+    return [pscustomobject]@{ ExitCode = $code; Output = $lines; Error = $errorLines }
+}
+
+function Get-StderrTail {
+    # " Last stderr lines: a | b" for the end of an error message, or '' when the program said nothing.
+    param([Parameter(Mandatory)][object]$Result, [int]$Count = 5)
+    $tail = @($Result.Error | Where-Object { $_ } | Select-Object -Last $Count)
+    if ($tail.Count -eq 0) { return '' }
+    return " Last stderr lines: $($tail -join ' | ')"
+}
+
+function Get-OpenWebUiContainerName {
+    # The Docker container (and volume) name Open WebUI runs under, shared by the scripts that
+    # create, start and stop it.
+    return 'open-webui'
 }
 
 function Get-OllamaRoot {
@@ -114,6 +132,26 @@ function Test-LoopbackAddress {
     $ip = $null
     if (-not [System.Net.IPAddress]::TryParse($text, [ref]$ip)) { return $false }
     return [System.Net.IPAddress]::IsLoopback($ip)
+}
+
+function Get-ListenerOnPort {
+    <#
+      The TCP listeners on a port. Get-NetTCPConnection reports "nothing matches" as an
+      ObjectNotFound error: that means no listener and gives an empty list. Any other
+      failure is not an answer, so it stops the caller with the reason (a security check
+      must not read "could not look" as "nobody is listening"). -Query is the lookup,
+      replaceable in tests; it receives the port.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$Port,
+        [scriptblock]$Query = { param($p) Get-NetTCPConnection -State Listen -LocalPort $p -ErrorAction Stop }
+    )
+    try {
+        return @(& $Query $Port)
+    } catch {
+        if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return @() }
+        throw "Could not query the listeners on port ${Port}: $($_.Exception.Message)"
+    }
 }
 
 function Get-LabPort {

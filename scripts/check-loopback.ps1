@@ -37,7 +37,7 @@ try {
     Write-Host "==> Lab ports: $($Port -join ', ')" -ForegroundColor Cyan
     $exposed = 0
     foreach ($p in $Port) {
-        $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $p -ErrorAction Ignore)
+        $listeners = @(Get-ListenerOnPort -Port $p)
         if ($listeners.Count -eq 0) {
             Write-Host "    ${p}: no listener" -ForegroundColor Green
             continue

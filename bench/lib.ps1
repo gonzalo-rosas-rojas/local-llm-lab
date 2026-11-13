@@ -146,7 +146,8 @@ function ConvertFrom-BenchOutput {
 
 function Get-ResultRecord {
     # Builds a record in the results/schema.json layout. Every key is present; what
-    # the caller could not learn is $null. `Series` is a list of objects with Name,
+    # the caller could not learn is $null. `Hardware` may hold Gpu, VramGb, RamGb, Cpu, Os and
+    # Driver (any it lacks is $null). `Series` is a list of objects with Name,
     # Label and Samples (one value per run, in run order).
     param(
         [Parameter(Mandatory)][string]$ModelFile,
@@ -158,8 +159,7 @@ function Get-ResultRecord {
         [Parameter(Mandatory)][object[]]$Series,
         [Parameter(Mandatory)][int]$Runs,
         [Parameter(Mandatory)][string]$TimestampUtc,
-        [string]$Gpu, [object]$VramGb, [object]$RamGb, [string]$Cpu,
-        [string]$Os, [string]$Driver,
+        [hashtable]$Hardware = @{},
         [string[]]$ExtraNotes = @()
     )
     $nullIfEmpty = { param($v) if ([string]::IsNullOrEmpty($v)) { $null } else { $v } }
@@ -207,9 +207,10 @@ function Get-ResultRecord {
         }
         metrics = @($metrics)
         hardware = [ordered]@{
-            gpu = (& $nullIfEmpty $Gpu); vram_gb = $VramGb; ram_gb = $RamGb; cpu = (& $nullIfEmpty $Cpu)
+            gpu = (& $nullIfEmpty $Hardware.Gpu); vram_gb = $Hardware.VramGb; ram_gb = $Hardware.RamGb
+            cpu = (& $nullIfEmpty $Hardware.Cpu)
         }
-        system = [ordered]@{ os = (& $nullIfEmpty $Os); gpu_driver = (& $nullIfEmpty $Driver) }
+        system = [ordered]@{ os = (& $nullIfEmpty $Hardware.Os); gpu_driver = (& $nullIfEmpty $Hardware.Driver) }
         measured_on = [ordered]@{ date = $TimestampUtc; date_kind = 'measurement'; commit = $null }
         command = $Command
         runs = $Runs

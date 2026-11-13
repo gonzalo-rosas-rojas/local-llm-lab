@@ -41,7 +41,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     try {
         $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
         if ($list.ExitCode -eq $ExitCommandNotFound) { throw "ollama was not found. Run .\scripts\01-install-ollama.ps1 first." }
-        if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode)). Is the server running? Try .\scripts\start-lab.ps1" }
+        if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode)). Is the server running? Try .\scripts\start-lab.ps1$(Get-StderrTail -Result $list)" }
 
         $failed = 0
         # Fast starter: validates the pipeline in minutes (~89 tok/s, 100% GPU)
@@ -50,9 +50,8 @@ if ($MyInvocation.InvocationName -ne '.') {
         # Quality main model that FITS 100% on the GPU (~113 tok/s, 100% GPU)
         if (-not (Install-OllamaModel -Tag 'gpt-oss:20b' -Note 'main ~13GB, MoE with 3.6B active, fits entirely' -ListLines $list.Output)) { $failed++ }
 
-        # --- DEFERRED to stage 3 (does not fit in 16GB; needs offload to RAM) ---
-        # Uncomment to experiment with MoE offload (--cpu-moe in llama.cpp):
-        # if (-not (Install-OllamaModel -Tag 'gemma4:26b-a4b-it-q4_K_M' -Note '~18GB > 16GB VRAM; offload to 64GB RAM' -ListLines $list.Output)) { $failed++ }
+        # Stage 3 (MoE offload, a model that does not fit in 16GB) does not use an Ollama tag:
+        # its GGUF and launcher are described in docs/moe-offload.md.
 
         Write-Host "`n==> Available models:" -ForegroundColor Cyan
         [void](Invoke-External -Exe 'ollama' -Arguments @('list'))

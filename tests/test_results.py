@@ -36,6 +36,8 @@ ORIGINAL_FIGURES = [
 
 # A sentence of the README's hand-written text that the generator must leave alone.
 STALE_PHRASE = "~13% faster"
+# What the tests replace it with.
+EDITED_PHRASE = "~50% faster"
 
 
 def record_files():
@@ -92,28 +94,21 @@ class RecordsMatchSchema(unittest.TestCase):
 
     def test_validator_rejects_bad_records(self):
         good = json.loads(record_files()[0].read_text(encoding="utf-8"))
-        cases = {}
-        bad = copy.deepcopy(good)
-        del bad["runs"]
-        cases["missing key"] = bad
-        bad = copy.deepcopy(good)
-        bad["extra"] = 1
-        cases["unexpected key"] = bad
-        bad = copy.deepcopy(good)
-        bad["metrics"][0]["value"] = "89"
-        cases["value as string"] = bad
-        bad = copy.deepcopy(good)
-        bad["metrics"][0]["unit"] = "furlongs"
-        cases["unknown unit"] = bad
-        bad = copy.deepcopy(good)
-        bad["measured_on"]["date"] = "22/10/2026"
-        cases["date format"] = bad
-        bad = copy.deepcopy(good)
-        bad["runs"] = 0
-        cases["zero runs"] = bad
-        bad = copy.deepcopy(good)
-        bad["schema_version"] = 2
-        cases["version"] = bad
+
+        def corrupt(edit):
+            bad = copy.deepcopy(good)
+            edit(bad)
+            return bad
+
+        cases = {
+            "missing key": corrupt(lambda r: r.pop("runs")),
+            "unexpected key": corrupt(lambda r: r.update(extra=1)),
+            "value as string": corrupt(lambda r: r["metrics"][0].update(value="89")),
+            "unknown unit": corrupt(lambda r: r["metrics"][0].update(unit="furlongs")),
+            "date format": corrupt(lambda r: r["measured_on"].update(date="22/10/2026")),
+            "zero runs": corrupt(lambda r: r.update(runs=0)),
+            "version": corrupt(lambda r: r.update(schema_version=2)),
+        }
         for label, record in cases.items():
             with self.subTest(label):
                 self.assertNotEqual(rr.validate(record, self.schema), [])
@@ -157,6 +152,13 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         svg = rr.render_svg(records)
         self.assertNotIn("run counts are not recorded", svg)
         self.assertIn("Approximate figures (see results/).", svg)
+
+    def test_a_chart_with_no_chart_records_says_so(self):
+        records = rr.load_records(ROOT)
+        for r in records:
+            r["chart"] = None
+        with self.assertRaisesRegex(ValueError, "chart"):
+            rr.render_svg(records)
 
     def test_chart_axis_covers_the_largest_bar(self):
         self.assertGreaterEqual(rr.nice_max(113), 113)
@@ -205,7 +207,7 @@ class GeneratorBehaviour(unittest.TestCase):
         readme = tmp / "README.md"
         text = readme.read_text(encoding="utf-8")
         self.assertIn(STALE_PHRASE, text)
-        readme.write_text(text.replace(STALE_PHRASE, "~50% faster"), encoding="utf-8")
+        readme.write_text(text.replace(STALE_PHRASE, EDITED_PHRASE), encoding="utf-8")
         self.assertEqual(self.run_main("--check", "--root", str(tmp))[0], 1)
 
     def test_text_outside_the_markers_is_preserved(self):
@@ -221,7 +223,7 @@ class GeneratorBehaviour(unittest.TestCase):
         readme = tmp / "README.md"
         data = readme.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
         self.assertIn(STALE_PHRASE.encode(), data)
-        data = data.replace(STALE_PHRASE.encode(), b"~50% faster")
+        data = data.replace(STALE_PHRASE.encode(), EDITED_PHRASE.encode())
         readme.write_bytes(data)
         self.assertEqual(self.run_main("--root", str(tmp))[0], 0)
         self.assertIn(b"\r\n", readme.read_bytes())

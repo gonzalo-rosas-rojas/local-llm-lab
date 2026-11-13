@@ -40,6 +40,8 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+$ContainerName = Get-OpenWebUiContainerName
+
 try {
     # 1) Docker must be available and running
     $info = Invoke-External -Exe 'docker' -Arguments @('info') -Capture
@@ -48,20 +50,20 @@ try {
     }
 
     # 2) Idempotent: if the container already exists, just start it
-    $names = Invoke-External -Exe 'docker' -Arguments @('ps', '-a', '--filter', 'name=open-webui', '--format', '{{.Names}}') -Capture
+    $names = Invoke-External -Exe 'docker' -Arguments @('ps', '-a', '--filter', "name=$ContainerName", '--format', '{{.Names}}') -Capture
     if ($names.ExitCode -ne 0) { throw "'docker ps' failed (exit code $($names.ExitCode))." }
-    if ($names.Output -contains 'open-webui') {
-        Write-Host "==> The 'open-webui' container already exists. Starting it..." -ForegroundColor Yellow
-        $r = Invoke-External -Exe 'docker' -Arguments @('start', 'open-webui')
-        if ($r.ExitCode -ne 0) { throw "'docker start open-webui' failed (exit code $($r.ExitCode))." }
+    if ($names.Output -contains $ContainerName) {
+        Write-Host "==> The '$ContainerName' container already exists. Starting it..." -ForegroundColor Yellow
+        $r = Invoke-External -Exe 'docker' -Arguments @('start', $ContainerName)
+        if ($r.ExitCode -ne 0) { throw "'docker start $ContainerName' failed (exit code $($r.ExitCode))." }
     } else {
-        Write-Host "==> Creating the 'open-webui' container from $Image..." -ForegroundColor Cyan
+        Write-Host "==> Creating the '$ContainerName' container from $Image..." -ForegroundColor Cyan
         $r = Invoke-External -Exe 'docker' -Arguments @(
             'run', '-d',
             '-p', '127.0.0.1:3000:8080',
             '--add-host=host.docker.internal:host-gateway',
-            '-v', 'open-webui:/app/backend/data',
-            '--name', 'open-webui',
+            '-v', "${ContainerName}:/app/backend/data",
+            '--name', $ContainerName,
             '--restart', 'unless-stopped',
             $Image
         )

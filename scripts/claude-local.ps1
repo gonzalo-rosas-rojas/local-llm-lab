@@ -19,16 +19,31 @@
   tool use; expect less precise edits and less reliable loops.
 #>
 param(
-    [string]$Model = 'gpt-oss-cc:latest',
+    [string]$Model,
     [Parameter(ValueFromRemainingArguments = $true)] $Rest
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+# The default model: a gpt-oss variant created below with a large context.
+$CustomModelName = 'gpt-oss-cc'
+$CustomModelTag = "${CustomModelName}:latest"
+if (-not $PSBoundParameters.ContainsKey('Model')) { $Model = $CustomModelTag }
+
+# The variables set for this launch only. 'ollama' is a placeholder, not a secret: Ollama
+# does not check the token, but Claude Code wants a non-empty value here.
+$launchEnv = [ordered]@{
+    ANTHROPIC_BASE_URL = 'http://localhost:11434'
+    ANTHROPIC_AUTH_TOKEN = 'ollama'
+    ANTHROPIC_API_KEY = ''
+    ANTHROPIC_MODEL = $Model
+    ANTHROPIC_SMALL_FAST_MODEL = 'qwen3:8b'
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+}
 # A script run from a prompt shares the caller's process, so $env: changes would
-# outlive it. Save what we touch and put it back in the finally block below.
-$names = 'Path', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY',
-         'ANTHROPIC_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'
+# outlive it. Save what we touch (the table above and Path) and put it back in the
+# finally block below.
+$names = @('Path') + @($launchEnv.Keys)
 $saved = @{}
 foreach ($n in $names) { $saved[$n] = [System.Environment]::GetEnvironmentVariable($n, 'Process') }
 $exitCode = 0
@@ -44,28 +59,21 @@ try {
 
     # Claude Code needs a lot of context. If you asked for gpt-oss-cc and it does not
     # exist, create a gpt-oss variant with a large num_ctx (Ollama's default is small).
-    if ($Model -eq 'gpt-oss-cc:latest') {
+    if ($Model -eq $CustomModelTag) {
         $list = Invoke-External -Exe 'ollama' -Arguments @('list') -Capture
-        if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode))." }
-        if (-not (Test-ModelListed -ListLines $list.Output -Tag 'gpt-oss-cc:latest')) {
-            Write-Host "Creating gpt-oss-cc (num_ctx $ClaudeContextTokens) from gpt-oss:20b..." -ForegroundColor Cyan
+        if ($list.ExitCode -ne 0) { throw "'ollama list' failed (exit code $($list.ExitCode)).$(Get-StderrTail -Result $list)" }
+        if (-not (Test-ModelListed -ListLines $list.Output -Tag $CustomModelTag)) {
+            Write-Host "Creating $CustomModelName (num_ctx $ClaudeContextTokens) from gpt-oss:20b..." -ForegroundColor Cyan
             $mf = Join-Path $env:TEMP 'Modelfile.gpt-oss-cc'
             "FROM gpt-oss:20b`nPARAMETER num_ctx $ClaudeContextTokens" | Set-Content -Path $mf -Encoding ascii
-            $create = Invoke-External -Exe 'ollama' -Arguments @('create', 'gpt-oss-cc', '-f', $mf) -Capture
-            if ($create.ExitCode -ne 0) { throw "'ollama create gpt-oss-cc' failed (exit code $($create.ExitCode)). Is gpt-oss:20b downloaded? Run .\scripts\02-pull-models.ps1" }
+            $create = Invoke-External -Exe 'ollama' -Arguments @('create', $CustomModelName, '-f', $mf) -Capture
+            if ($create.ExitCode -ne 0) { throw "'ollama create $CustomModelName' failed (exit code $($create.ExitCode)). Is gpt-oss:20b downloaded? Run .\scripts\02-pull-models.ps1$(Get-StderrTail -Result $create)" }
         }
     }
     if (-not (Get-Command claude -ErrorAction Ignore)) { throw "The 'claude' command was not found. Install Claude Code first." }
 
     # Variables for this launch only (restored when claude exits)
-    $env:ANTHROPIC_BASE_URL = 'http://localhost:11434'
-    # 'ollama' is a placeholder, not a secret: Ollama does not check the token, but Claude Code
-    # wants a non-empty value here.
-    $env:ANTHROPIC_AUTH_TOKEN = 'ollama'
-    $env:ANTHROPIC_API_KEY = ''
-    $env:ANTHROPIC_MODEL = $Model
-    $env:ANTHROPIC_SMALL_FAST_MODEL = 'qwen3:8b'
-    $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+    foreach ($name in $launchEnv.Keys) { Set-Item -LiteralPath "Env:$name" -Value $launchEnv[$name] }
 
     Write-Host "Claude Code -> LOCAL Ollama ($Model). Your normal Claude Code is NOT affected." -ForegroundColor Green
     & claude --model $Model @Rest

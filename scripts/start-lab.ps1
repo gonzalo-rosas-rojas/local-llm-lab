@@ -15,10 +15,12 @@ $ollamaApp = Join-Path (Get-OllamaRoot) 'ollama app.exe'
 $ollamaExe = Join-Path (Get-OllamaRoot) 'ollama.exe'
 $ollamaVersionUrl = 'http://localhost:11434/api/version'
 $ollamaWaitSeconds = 20
+$ollamaProbeTimeoutSec = 2
 $webUiUrl = 'http://localhost:3000'
+$webUiContainer = Get-OpenWebUiContainerName
 
 function Test-Ollama {
-    try { Invoke-WebRequest $ollamaVersionUrl -UseBasicParsing -TimeoutSec 2 | Out-Null; return $true }
+    try { Invoke-WebRequest $ollamaVersionUrl -UseBasicParsing -TimeoutSec $ollamaProbeTimeoutSec | Out-Null; return $true }
     catch { return $false }
 }
 
@@ -36,13 +38,13 @@ if (Test-Ollama) {
 Write-Host "==> Open WebUI (only if Docker is running)..." -ForegroundColor Cyan
 $docker = Invoke-External -Exe 'docker' -Arguments @('info') -Capture
 if ($docker.ExitCode -eq 0) {
-    $start = Invoke-External -Exe 'docker' -Arguments @('start', 'open-webui') -Capture
+    $start = Invoke-External -Exe 'docker' -Arguments @('start', $webUiContainer) -Capture
     if ($start.ExitCode -eq 0) {
         Write-Host "    Open WebUI -> $webUiUrl" -ForegroundColor Green
         Start-Process $webUiUrl
     } else {
-        Write-Host "    The 'open-webui' container could not be started (it may not exist yet: run .\scripts\03-start-openwebui.ps1)." -ForegroundColor Yellow
+        Write-Host "    The '$webUiContainer' container could not be started (it may not exist yet: run .\scripts\03-start-openwebui.ps1)." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "    Docker is not running. Open Docker Desktop and Open WebUI will start by itself." -ForegroundColor Yellow
+    Write-Host "    Docker is not running. Open Docker Desktop, then run this script again to start Open WebUI." -ForegroundColor Yellow
 }

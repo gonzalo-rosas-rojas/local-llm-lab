@@ -66,13 +66,15 @@ $series = @(
 )
 $record = Get-ResultRecord -ModelFile 'Test-Model-Q4_K_M.gguf' -ModelSizeGiB 1.234 -Build 'b1' -Backend 'CUDA' `
     -Flags @('-ngl', '99', '-fa', '1') -Command 'llama-bench -m x' -Series $series -Runs 3 `
-    -TimestampUtc '2000-01-02T03:04:05Z' -Gpu 'Test GPU' -VramGb 8 -RamGb 16 -Cpu 'Test CPU' `
-    -Os 'Test OS' -Driver '1.2.3'
+    -TimestampUtc '2000-01-02T03:04:05Z' `
+    -Hardware @{ Gpu = 'Test GPU'; VramGb = 8; RamGb = 16; Cpu = 'Test CPU'; Os = 'Test OS'; Driver = '1.2.3' }
 Confirm-Equal $record.metrics[0].value 200.0 'pp median in the record'
 Confirm-Equal $record.metrics[1].value 11.0 'tg median in the record'
 Confirm-Equal $record.metrics[1].samples @(10.0, 12.0, 11.0) 'samples are kept in run order'
 Confirm-Equal $record.parameters.gpu_layers 99 'gpu_layers read from -ngl'
 Confirm-Equal $record.parameters.flash_attention $true 'flash_attention read from -fa'
+Confirm-Equal $record.hardware ([ordered]@{ gpu = 'Test GPU'; vram_gb = 8; ram_gb = 16; cpu = 'Test CPU' }) 'hardware block from -Hardware'
+Confirm-Equal $record.system ([ordered]@{ os = 'Test OS'; gpu_driver = '1.2.3' }) 'system block from -Hardware'
 Confirm-Equal $record.measured_on.date_kind 'measurement' 'date kind'
 Confirm-Equal $record.model.size_gb 1.23 'size rounded to two decimals'
 Confirm-Equal $record.id 'bench-20000102t030405z-test-model-q4-k-m' 'record id'
