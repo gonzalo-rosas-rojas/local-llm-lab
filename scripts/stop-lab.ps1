@@ -28,6 +28,8 @@ $webUiContainer = Get-OpenWebUiContainerName
 $llamaRoot = Join-Path $PSScriptRoot '..\tools\llamacpp'
 
 function Stop-LabProcess {
+    # No -Force on purpose: a process that runs from outside the lab folders is never stopped without asking.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidShouldContinueWithoutForce', '', Justification = 'Stopping a process outside the lab folders always asks.')]
     [CmdletBinding(SupportsShouldProcess)]
     param([string[]]$Name, [string]$Root, [string]$Label)
     $found = Get-LabProcess -Name $Name -Root @($Root)

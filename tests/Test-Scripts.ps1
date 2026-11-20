@@ -79,9 +79,9 @@ Confirm-Equal (Get-LabPort -ScriptPath $labScripts) $labPorts 'the lab scripts n
 Confirm-Equal (Get-OpenWebUiContainerName) 'open-webui' 'Open WebUI container name'
 
 # Listener query: "nothing listens" is an answer, any other failure is not.
-$notFound = { param($p) Write-Error -Message 'no match' -Category ObjectNotFound -ErrorAction Stop }
+$notFound = { param($p) Write-Error -Message "no match on port $p" -Category ObjectNotFound -ErrorAction Stop }
 $listening = { param($p) @([pscustomobject]@{ LocalPort = $p; LocalAddress = '0.0.0.0' }) }
-$broken = { param($p) throw 'access denied by the fake query' }
+$broken = { param($p) throw "access denied by the fake query on port $p" }
 Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $notFound).Count 0 'no match means no listener'
 Confirm-Equal @(Get-ListenerOnPort -Port 8080 -Query $listening)[0].LocalAddress '0.0.0.0' 'listeners are returned'
 $failure = $null
